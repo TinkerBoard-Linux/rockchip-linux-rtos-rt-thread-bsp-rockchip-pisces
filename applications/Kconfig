@@ -1,0 +1,24 @@
+menu "Pisces application"
+
+menuconfig RT_USING_OLPC_DEMO
+    bool "olpc demo enable"
+    default n
+
+if RT_USING_OLPC_DEMO
+    choice
+        prompt "olpc functions select"
+        default OLPC_CLOCK_ENABLE
+
+        config OLPC_CLOCK_ENABLE
+            bool "olpc clock demo enable"
+
+        config OLPC_LVGL_CLOCK_ENABLE
+            bool "olpc lvgl GUI clock demo enable"
+            depends on RT_USING_LITTLEVGL2RTT
+
+        config OLPC_EBOOK_ENABLE
+            bool "olpc ebook demo enable"
+    endchoice
+endif
+
+endmenu

@@ -1,0 +1,141 @@
+source "$BSP_DIR/../rockchip-common/drivers/Kconfig"
+
+menu "RT-Thread rockchip pisces drivers"
+
+config RT_USING_CRU
+    bool "Enable CRU"
+    default n
+
+    if RT_USING_CRU
+    config PLL_INPUT_OSC_RATE
+        int "the osc rate for soc"
+        default 24000000
+    endif
+
+config RT_USING_DMA
+    bool "Enable General DMA Framework"
+    default n
+
+choice
+    prompt "DMA Type"
+    depends on RT_USING_DMA
+
+    config RT_USING_DMA_PL330
+        bool "Enable PL330 DMA Controller"
+        default n
+endchoice
+
+config RT_USING_PMU
+    bool "Enable PMU"
+    default n
+
+config RT_USING_RGB
+    bool "Enable RGB"
+    default n
+
+config RT_USING_VOP
+    bool "Enable VOP"
+    default n
+
+config RT_USING_DSI
+     bool "Enable MIPI DSI"
+     default n
+
+menu "Enable DSP"
+    config RT_USING_DSP
+        bool "Enable DSP"
+        default n
+
+    if RT_USING_DSP
+    config RT_USING_DSPFW_LOADER
+        bool "Enable firmware loader to dsp"
+        default n
+
+    config RT_USING_DSP_TRACE
+        bool "Enable dsp send trace to cm4"
+        default n
+
+    config RT_DSP_UART_PORT
+        int "Config dsp debug uart port"
+        range -1 1
+        default -1
+        help
+            set -1, will not set uart port to dsp
+
+    endif
+endmenu
+
+menu "Enable UART"
+    config RT_USING_UART
+        bool "Enable UART"
+        default n
+
+    if RT_USING_UART
+    config RT_USING_UART0
+        bool "Enable UART0"
+        default n
+
+    config RT_USING_UART1
+        bool "Enable UART1"
+        default n
+    endif
+endmenu
+
+if RT_USING_I2C
+menu "Enable I2C"
+    config RT_USING_I2C0
+        bool "Enable I2C0"
+        default n
+
+    config RT_USING_I2C1
+        bool "Enable I2C1"
+        default n
+
+    config RT_USING_I2C2
+        bool "Enable I2C2"
+        default n
+endmenu
+endif
+
+if RT_USING_SPI
+menu "Enable SPI"
+    config RT_USING_SPI2APB
+        bool "Enable SPI0 (SPI2APB)"
+        default n
+
+    config RT_USING_SPI1
+        bool "Enable SPI1"
+        default n
+endmenu
+endif
+
+if RT_USING_AUDIO
+menu "Enable Audio"
+    config RT_USING_PCM
+        bool "Enable PCM"
+        select RT_USING_DMA
+        default y
+
+    config RT_USING_ACDCDIG
+        bool "Enable ACDCDIG"
+        default n
+
+    config RT_USING_I2STDM
+        bool "Enable I2STDM"
+        default n
+
+    config RT_USING_PDM
+        bool "Enable PDM"
+        default n
+
+    config RT_USING_VAD
+        bool "Enable VAD"
+        default n
+endmenu
+endif
+
+config RT_USING_TOUCH
+    bool "Enable Touch"
+    default n
+
+endmenu
