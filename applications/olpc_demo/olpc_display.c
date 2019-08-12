@@ -8,6 +8,7 @@
 #include "drv_heap.h"
 #include "image_info.h"
 #include "olpc_display.h"
+#include "jbig2dec.h"
 
 #define PI 3.1415926535898
 #define NULL_CODE           -1      // indicates a NULL prefix
@@ -414,7 +415,7 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
         }
         else //if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY1)
         {
-            /* code */
+            jbig2_decompression(img_info, fb, xVir, xoffset, yoffset);
         }
 
     }
