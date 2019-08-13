@@ -1038,6 +1038,7 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
 static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
 {
     rt_err_t ret;
+    rt_device_t  device = olpc_data->disp->device;
 
     //rt_tick_t ticks = rt_tick_get();
     //rt_kprintf("clock ticks = %d\n", rt_tick_get() - ticks);
@@ -1055,6 +1056,9 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
 
         olpc_clock_msg_region_move(olpc_data);
     }
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+    RT_ASSERT(ret == RT_EOK);
 
     if ((olpc_data->cmd & UPDATE_CLOCK) == UPDATE_CLOCK)
     {
@@ -1074,7 +1078,6 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
     /* else */if ((olpc_data->cmd & UPDATE_HOME) == UPDATE_HOME)
     {
         olpc_data->cmd &= ~UPDATE_HOME;
-
         ret = olpc_clock_home_region_refresh(olpc_data);
         RT_ASSERT(ret == RT_EOK);
 
@@ -1086,6 +1089,12 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
         ret = olpc_clock_fingerprint_region_refresh(olpc_data);
         RT_ASSERT(ret == RT_EOK);
     }
+
+    ret = rt_display_sync_hook(device);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    RT_ASSERT(ret == RT_EOK);
 
     if (olpc_data->cmd != 0)
     {

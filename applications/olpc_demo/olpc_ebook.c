@@ -307,6 +307,9 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
         RT_ASSERT(pagewin.fblen <= olpc_data->fblen);
     }
 
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+    RT_ASSERT(ret == RT_EOK);
+
     /* Page update */
     if ((olpc_data->cmd & UPDATE_PAGE) == UPDATE_PAGE)
     {
@@ -370,6 +373,12 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
     }
 
     ret = rt_display_win_layers_set(wlist_head);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_display_sync_hook(device);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
     RT_ASSERT(ret == RT_EOK);
 
     //update date next item
