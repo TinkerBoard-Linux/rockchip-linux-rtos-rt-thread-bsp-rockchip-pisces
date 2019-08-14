@@ -9,6 +9,13 @@
 #include "drv_touch.h"
 #endif
 
+/**
+ * color palette for 1bpp
+ */
+static uint32_t bpp1_lut[2] =
+{
+    0x000000, 0x005E5E5E
+};
 
 /*
  **************************************************************************************************
@@ -17,7 +24,8 @@
  *
  **************************************************************************************************
  */
-#define COLOR_DEPTH         1
+#define EBOOK_TEXT_GRAY1_WIN   0
+#define EBOOK_BTG_RGB565_WIN   1
 
 #define EBOOK_WIN_FB_MAX_W  ((WIN_LAYERS_W / 32) * 32)    /* align 32 */
 #define EBOOK_WIN_FB_MAX_H  WIN_LAYERS_H
@@ -29,8 +37,16 @@
 #define EBOOK_FB_W          EBOOK_WIN_FB_MAX_W            /* ebook frame buffer w */
 #define EBOOK_FB_H          EBOOK_WIN_FB_MAX_H            /* ebook frame buffer h */
 
-#define DISP_EBOOK_WIN      1
+#define BTN_REGION_X        0
+#define BTN_REGION_Y        (WIN_LAYERS_H - 100 - 10)
+#define BTN_REGION_W        WIN_LAYERS_W
+#define BTN_REGION_H        100
+#define BTN_FB_W            EBOOK_WIN_FB_MAX_W            /* ebook frame buffer w */
+#define BTN_FB_H            100                           /* ebook frame buffer h */
+
 #define EBOOK_TIMER_PERIOD  (RT_TICK_PER_SECOND / 100)
+#define BTN_HOLD_TIME       (RT_TICK_PER_SECOND * 5)
+#define BTN_DOWN_TIME       (RT_TICK_PER_SECOND * 1)
 
 /* Event define */
 #define EVENT_EBOOK_REFRESH (0x01UL << 0)
@@ -38,6 +54,7 @@
 
 /* Command define */
 #define UPDATE_PAGE         (0x01UL << 0)
+#define UPDATE_BTN          (0x01UL << 1)
 
 /*
  **************************************************************************************************
@@ -51,6 +68,11 @@ extern image_info_t ebook_page2_info;
 extern image_info_t ebook_page3_info;
 extern image_info_t ebook_page4_info;
 extern image_info_t ebook_page5_info;
+
+extern image_info_t ebook_btn_rightup_info;
+extern image_info_t ebook_btn_rightdown_info;
+extern image_info_t ebook_btn_leftup_info;
+extern image_info_t ebook_btn_leftdown_info;
 
 /*
  **************************************************************************************************
@@ -73,11 +95,19 @@ struct olpc_ebook_data
     rt_timer_t  ebook_timer;
     void       *ebook_timer_parameter;
 
+    rt_uint8_t *btn_fb;
+    rt_uint32_t btn_fblen;
+
     rt_event_t  disp_event;
     rt_uint32_t cmd;
     rt_uint32_t ticks;
 
     rt_uint16_t page_num;
+    rt_uint8_t  lbtn_num;
+    rt_uint8_t  rbtn_num;
+    rt_uint8_t  btn_sta;
+    rt_uint32_t btnon_timeout;
+    rt_uint32_t btndown_timeout;
 };
 
 #define EBOOK_PAGE_MAX_NUM  5
@@ -88,6 +118,18 @@ static image_info_t *ebook_pages_num[EBOOK_PAGE_MAX_NUM] =
     &ebook_page3_info,
     &ebook_page4_info,
     &ebook_page5_info,
+};
+
+static image_info_t *btn_right_num[2] =
+{
+    &ebook_btn_rightup_info,
+    &ebook_btn_rightdown_info,
+};
+
+static image_info_t *btn_left_num[2] =
+{
+    &ebook_btn_leftup_info,
+    &ebook_btn_leftdown_info,
 };
 
 /*
@@ -103,7 +145,6 @@ static image_info_t *ebook_pages_num[EBOOK_PAGE_MAX_NUM] =
 static void olpc_ebook_timeout(void *parameter)
 {
     struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
-    rt_event_t event = olpc_data->disp_event;
 
     olpc_data->ticks += EBOOK_TIMER_PERIOD;
     if ((olpc_data->ticks % EBOOK_TIMER_PERIOD) != 0)
@@ -112,6 +153,32 @@ static void olpc_ebook_timeout(void *parameter)
     }
 
 #if defined(RT_USING_TOUCH)
+    // btn display on
+    if (olpc_data->btn_sta == 1)
+    {
+        olpc_data->btnon_timeout -= EBOOK_TIMER_PERIOD;
+        if (olpc_data->btnon_timeout < EBOOK_TIMER_PERIOD)
+        {
+            olpc_data->btn_sta = 0;
+            olpc_data->cmd |= /*UPDATE_PAGE | */UPDATE_BTN;
+            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+        }
+
+        // btn key timeout
+        if (olpc_data->btndown_timeout >= EBOOK_TIMER_PERIOD)
+        {
+            olpc_data->btndown_timeout -= EBOOK_TIMER_PERIOD;
+            if (olpc_data->btndown_timeout < EBOOK_TIMER_PERIOD)
+            {
+                olpc_data->lbtn_num = 0;
+                olpc_data->rbtn_num = 0;
+
+                olpc_data->cmd |= UPDATE_BTN;
+                rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+            }
+        }
+    }
+
     // Check touch screen every 10ms
     if ((olpc_data->ticks % 10) == 0)
     {
@@ -126,52 +193,61 @@ static void olpc_ebook_timeout(void *parameter)
 static rt_err_t olpc_ebook_init(struct olpc_ebook_data *olpc_data)
 {
     rt_err_t    ret;
-    rt_uint8_t  *fb;
-    rt_uint32_t fb_len;
-    rt_timer_t  timer;
     rt_device_t device = olpc_data->disp->device;
+    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
-    olpc_data->page_num = 0;
     olpc_data->ticks = 0;
+    olpc_data->page_num = 0;
+    olpc_data->lbtn_num = 0;
+    olpc_data->rbtn_num = 0;
+    olpc_data->btn_sta = 0;
+    olpc_data->btnon_timeout = 0;
+    olpc_data->btndown_timeout = 0;
+
     olpc_data->cmd = UPDATE_PAGE;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    fb_len  = EBOOK_WIN_FB_MAX_W * EBOOK_WIN_FB_MAX_H * COLOR_DEPTH / 8;
-    fb   = (rt_uint8_t *)rt_malloc_large(fb_len);
-    RT_ASSERT(fb != RT_NULL);
+    olpc_data->btn_fblen = BTN_FB_W * BTN_FB_H * 2;
+    olpc_data->btn_fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->btn_fblen);
+    RT_ASSERT(olpc_data->btn_fb != RT_NULL);
 
-    rt_uint16_t fb_w   = 32;
-    rt_uint16_t fb_h   = WIN_LAYERS_H;
-    RT_ASSERT((fb_w % 4) == 0);
-    RT_ASSERT((fb_h % 2) == 0);
-    RT_ASSERT((fb_w * fb_h) <= fb_len);
-    rt_memset((void *)fb, 0x00, fb_len);
+    olpc_data->fblen = EBOOK_WIN_FB_MAX_W * EBOOK_WIN_FB_MAX_H / 8;
+    olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
+    RT_ASSERT(olpc_data->fb != RT_NULL);
+
+    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+
+    wincfg.winId = EBOOK_TEXT_GRAY1_WIN;
+    wincfg.fb    = olpc_data->fb;
+    wincfg.w     = 32;
+    wincfg.h     = WIN_LAYERS_H;
+    wincfg.fblen = wincfg.w * wincfg.h / 8;
+    wincfg.x     = 0;
+    wincfg.y     = 0;
+    wincfg.ylast = wincfg.y;
+
+    RT_ASSERT((wincfg.w % 4) == 0);
+    RT_ASSERT((wincfg.h % 2) == 0);
+    RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
+
+    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
     //refresh screen
-    ret = rt_display_win_layer_set(device, DISP_EBOOK_WIN, RT_TRUE,
-                                   fb,   fb_w * fb_h / 8,
-                                   fb_w, fb_h,
-                                   0,    0,
-                                   0,    fb_h);
+    ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);
 
-    timer = rt_timer_create("olpc_ebook_timer",
-                            olpc_ebook_timeout,
-                            (void *)olpc_data,
-                            EBOOK_TIMER_PERIOD,
-                            RT_TIMER_FLAG_PERIODIC);
-    RT_ASSERT(timer != RT_NULL);
-
-    rt_timer_start(timer);
-
-    olpc_data->fb  = fb;
-    olpc_data->fblen = fb_len;
-
-    olpc_data->ebook_timer = timer;
+    olpc_data->ebook_timer = rt_timer_create("olpc_ebook_timer",
+                             olpc_ebook_timeout,
+                             (void *)olpc_data,
+                             EBOOK_TIMER_PERIOD,
+                             RT_TIMER_FLAG_PERIODIC);
+    RT_ASSERT(olpc_data->ebook_timer != RT_NULL);
     olpc_data->ebook_timer_parameter = (void *)olpc_data;
+
+    rt_timer_start(olpc_data->ebook_timer);
 
     return RT_EOK;
 }
@@ -190,61 +266,7 @@ static void olpc_ebook_deinit(struct olpc_ebook_data *olpc_data)
     RT_ASSERT(ret == RT_EOK);
 
     rt_free_large((void *)olpc_data->fb);
-}
-
-/**
- * olpc ebook page refresh
- */
-static rt_err_t olpc_ebook_page_refresh(struct olpc_ebook_data *olpc_data)
-{
-    rt_err_t ret;
-    rt_int32_t    x, y;
-    rt_int32_t    xoffset, yoffset;
-    rt_uint8_t   *fb = olpc_data->fb;
-    rt_uint32_t  fb_w, fb_h, fb_len;
-    rt_device_t  device = olpc_data->disp->device;
-    image_info_t *img_info = NULL;
-    struct rt_device_graphic_info info;
-
-    //rt_tick_t ticks = rt_tick_get();
-
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
-
-    rt_display_sync_hook(device, DISP_EBOOK_WIN);
-
-    fb     = olpc_data->fb;
-    fb_w   = ((EBOOK_FB_W + 31) / 32) * 32;
-    fb_h   = EBOOK_FB_H;
-    fb_len = fb_w * fb_h / 8;
-    RT_ASSERT((fb_w % 4) == 0);
-    RT_ASSERT((fb_h % 2) == 0);
-    RT_ASSERT(fb_len <= olpc_data->fblen);
-    rt_memset((void *)fb, 0x00, fb_len);
-
-    xoffset = 0;
-    yoffset = 0;
-    x  = EBOOK_REGION_X + (EBOOK_REGION_W - EBOOK_FB_W) / 2;
-    y  = EBOOK_REGION_Y + (EBOOK_REGION_H - EBOOK_FB_H) / 2;
-
-    //draw pages
-    img_info = ebook_pages_num[olpc_data->page_num];
-    //rt_kprintf("PAGE: page_num = %d\n", olpc_data->page_num);
-    RT_ASSERT(img_info->w <= fb_w);
-    RT_ASSERT(img_info->h <= fb_h);
-    rt_display_img_fill(img_info, fb, fb_w, xoffset + img_info->x, yoffset + img_info->y);
-
-    //refresh screen
-    ret = rt_display_win_layer_set(device, DISP_EBOOK_WIN, RT_TRUE,
-                                   fb,   fb_len,
-                                   fb_w, fb_h,
-                                   x,    y,
-                                   y,    fb_h);
-    RT_ASSERT(ret == RT_EOK);
-
-    //rt_kprintf("ebook page refresh ticks = %d\n", rt_tick_get() - ticks);
-
-    return RT_EOK;
+    rt_free_large((void *)olpc_data->btn_fb);
 }
 
 /**
@@ -253,15 +275,102 @@ static rt_err_t olpc_ebook_page_refresh(struct olpc_ebook_data *olpc_data)
 static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
 {
     rt_err_t ret;
+    rt_int32_t   xoffset, yoffset;
+    rt_device_t  device = olpc_data->disp->device;
+    image_info_t *img_info = NULL;
+    struct rt_device_graphic_info info;
+    struct rt_display_config btnwin, pagewin, *wlist_head = RT_NULL;
 
+    //rt_tick_t ticks = rt_tick_get();
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
+
+    rt_display_sync_hook(device);
+
+    // only send page buffer
+    {
+        rt_display_win_layers_list(&wlist_head, &pagewin);
+
+        rt_memset(&pagewin, 0, sizeof(struct rt_display_config));
+        pagewin.winId = EBOOK_TEXT_GRAY1_WIN;
+        pagewin.fb    = olpc_data->fb;
+        pagewin.w     = ((EBOOK_FB_W + 31) / 32) * 32;
+        pagewin.h     = EBOOK_FB_H;
+        pagewin.fblen = pagewin.w * pagewin.h / 8;
+        pagewin.x     = EBOOK_REGION_X + (EBOOK_REGION_W - EBOOK_FB_W) / 2;
+        pagewin.y     = EBOOK_REGION_Y + (EBOOK_REGION_H - EBOOK_FB_H) / 2;
+        pagewin.ylast = pagewin.y;
+
+        RT_ASSERT((pagewin.w % 4) == 0);
+        RT_ASSERT((pagewin.h % 2) == 0);
+        RT_ASSERT(pagewin.fblen <= olpc_data->fblen);
+    }
+
+    /* Page update */
     if ((olpc_data->cmd & UPDATE_PAGE) == UPDATE_PAGE)
     {
         olpc_data->cmd &= ~UPDATE_PAGE;
 
-        ret = olpc_ebook_page_refresh(olpc_data);
-        RT_ASSERT(ret == RT_EOK);
+        rt_memset((void *)pagewin.fb, 0x00, pagewin.fblen);
 
+        xoffset = 0;
+        yoffset = 0;
+
+        //draw pages
+        img_info = ebook_pages_num[olpc_data->page_num];
+        //rt_kprintf("page_num = %d\n", olpc_data->page_num);
+        RT_ASSERT(img_info->w <= pagewin.w);
+        RT_ASSERT(img_info->h <= pagewin.h);
+        rt_display_img_fill(img_info, pagewin.fb, pagewin.w, xoffset + img_info->x, yoffset + img_info->y);
     }
+
+    if ((olpc_data->cmd & UPDATE_BTN) == UPDATE_BTN)
+    {
+        olpc_data->cmd &= ~UPDATE_BTN;
+
+        rt_display_win_layers_list(&wlist_head, &btnwin);
+
+        rt_memset(&btnwin, 0, sizeof(struct rt_display_config));
+        btnwin.winId = EBOOK_BTG_RGB565_WIN;
+        btnwin.fb    = olpc_data->btn_fb;
+        btnwin.colorkey = COLOR_KEY_EN | 0x000000;
+        btnwin.w     = BTN_FB_W;
+        btnwin.h     = BTN_FB_H;
+        btnwin.fblen = btnwin.w * btnwin.h * 2;
+        btnwin.x     = BTN_REGION_X + (BTN_REGION_W - BTN_FB_W) / 2;
+        btnwin.y     = BTN_REGION_Y + (BTN_REGION_H - BTN_FB_H) / 2;
+        btnwin.ylast = btnwin.y;
+
+        RT_ASSERT((btnwin.w % 4) == 0);
+        RT_ASSERT((btnwin.h % 2) == 0);
+        RT_ASSERT(btnwin.fblen <= olpc_data->btn_fblen);
+
+        rt_memset((void *)btnwin.fb, 0x00, btnwin.fblen);
+
+        xoffset = 0;
+        yoffset = 0;
+
+        if (olpc_data->btn_sta == 1)
+        {
+            //draw left btn
+            img_info     = btn_left_num[olpc_data->lbtn_num];
+            //rt_kprintf("lbtn_num = %d\n", olpc_data->lbtn_num);
+            RT_ASSERT(img_info->w <= btnwin.w);
+            RT_ASSERT(img_info->h <= btnwin.h);
+            rt_display_img_fill(img_info, btnwin.fb, btnwin.w, xoffset + img_info->x, yoffset + img_info->y);
+
+            //draw left btn
+            img_info     = btn_right_num[olpc_data->rbtn_num];
+            //rt_kprintf("rbtn_num = %d\n", olpc_data->rbtn_num);
+            RT_ASSERT(img_info->w <= btnwin.w);
+            RT_ASSERT(img_info->h <= btnwin.h);
+            rt_display_img_fill(img_info, btnwin.fb, btnwin.w, xoffset + img_info->x, yoffset + img_info->y);
+        }
+    }
+
+    ret = rt_display_win_layers_set(wlist_head);
+    RT_ASSERT(ret == RT_EOK);
 
     //update date next item
     if (olpc_data->cmd != 0)
@@ -287,7 +396,6 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
 static rt_err_t olpc_ebook_get_touch(struct olpc_ebook_data *olpc_data)
 {
     rt_size_t rd_size;
-    rt_uint16_t i, x, y;
     struct point_info point;
     struct rt_device_graphic_info info;
     rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
@@ -306,12 +414,66 @@ static rt_err_t olpc_ebook_get_touch(struct olpc_ebook_data *olpc_data)
     }
     rt_memcpy(&olpc_data->point, &point, sizeof(struct point_info));
 
+    if (olpc_data->btn_sta == 0)
     {
-        olpc_data->page_num ++;
-        olpc_data->page_num %= EBOOK_PAGE_MAX_NUM;
-        olpc_data->cmd |= UPDATE_PAGE;
+        olpc_data->btn_sta = 1;
+
+        olpc_data->lbtn_num = 0;
+        olpc_data->rbtn_num = 0;
+        olpc_data->cmd |= /*UPDATE_PAGE | */UPDATE_BTN;
         rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
     }
+    else
+    {
+        image_info_t *img_info;
+        rt_uint16_t x = BTN_REGION_X + (BTN_REGION_W - BTN_FB_W) / 2;
+        rt_uint16_t y = BTN_REGION_Y + (BTN_REGION_H - BTN_FB_H) / 2;
+
+        //left btn
+        img_info = btn_left_num[olpc_data->lbtn_num];
+        if (((x + img_info->x) < olpc_data->point.x) && (olpc_data->point.x < (x + img_info->x + img_info->w)))
+        {
+            if (((y + img_info->y) < olpc_data->point.y) && (olpc_data->point.y < (y + img_info->y + img_info->h)))
+            {
+                olpc_data->lbtn_num  = 1;
+                olpc_data->rbtn_num  = 0;
+
+                if (olpc_data->page_num > 0)
+                {
+                    olpc_data->page_num --;
+                }
+
+                olpc_data->btndown_timeout = BTN_DOWN_TIME;
+                olpc_data->cmd |= UPDATE_PAGE | UPDATE_BTN;
+                rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+                goto btn_down;
+            }
+        }
+
+        //right btn
+        img_info = btn_right_num[olpc_data->rbtn_num];
+        if (((x + img_info->x) < olpc_data->point.x) && (olpc_data->point.x < (x + img_info->x + img_info->w)))
+        {
+            if (((y + img_info->y) < olpc_data->point.y) && (olpc_data->point.y < (y + img_info->y + img_info->h)))
+            {
+                olpc_data->lbtn_num  = 0;
+                olpc_data->rbtn_num  = 1;
+
+                if (olpc_data->page_num < EBOOK_PAGE_MAX_NUM - 1)
+                {
+                    olpc_data->page_num ++;
+                }
+
+                olpc_data->btndown_timeout = BTN_DOWN_TIME;
+                olpc_data->cmd |= UPDATE_PAGE | UPDATE_BTN;
+                rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+                //goto btn_down;
+            }
+        }
+    }
+
+btn_down:
+    olpc_data->btnon_timeout = BTN_HOLD_TIME;   //reset timer
 
     return RT_EOK;
 }
@@ -333,12 +495,26 @@ static void olpc_ebook_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_ebook_data *olpc_data;
+    struct rt_display_lut btnlut, pagelut;
 
     olpc_data = (struct olpc_ebook_data *)rt_malloc(sizeof(struct olpc_ebook_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_ebook_data));
 
-    olpc_data->disp = rt_display_init();
+    /* init bpp_lut[256] */
+    //rt_display_update_lut(FORMAT_RGB_332);
+
+    pagelut.winId = EBOOK_TEXT_GRAY1_WIN;
+    pagelut.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    pagelut.lut  = bpp1_lut;
+    pagelut.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
+
+    btnlut.winId = EBOOK_BTG_RGB565_WIN;
+    btnlut.format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+    btnlut.lut  = RT_NULL;
+    btnlut.size = 0;
+
+    olpc_data->disp = rt_display_init(&pagelut, &btnlut, RT_NULL);
     RT_ASSERT(olpc_data->disp != RT_NULL);
 
 #if defined(RT_USING_TOUCH)

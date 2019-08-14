@@ -17,6 +17,7 @@
 #ifndef __OLPC_DISPLAY_H__
 #define __OLPC_DISPLAY_H__
 #include <rtthread.h>
+#include "color_palette.h"
 
 /* Macro define */
 #define MIN(X, Y)           ((X)<(Y)?(X):(Y))
@@ -38,13 +39,40 @@
 #define WSCALE              (WIN_SCALED_W / WIN_LAYERS_W)
 #define HSCALE              (WIN_SCALED_H / WIN_LAYERS_H)
 
+#define COLOR_KEY_EN        (0x01UL << 24)
+
 /**
  * Global data struct for olpc display demo
  */
+struct rt_display_lut
+{
+    rt_uint8_t  winId;
+    rt_uint8_t  format;
+    rt_uint32_t *lut;
+    rt_uint32_t size;
+};
+
+struct rt_display_config
+{
+    struct rt_display_config *next;
+
+    rt_uint8_t  winId;
+    rt_uint8_t  *fb;
+    rt_uint32_t fblen;
+    rt_uint32_t colorkey;
+
+    rt_uint16_t x;
+    rt_uint16_t y;
+    rt_uint16_t ylast;
+    rt_uint16_t w;
+    rt_uint16_t h;
+};
+
 struct rt_display_data
 {
     rt_device_t device;
     struct rt_device_graphic_info info;
+    struct rt_display_lut lut[3];
 
     rt_uint16_t xres;
     rt_uint16_t yres;
@@ -52,11 +80,21 @@ struct rt_display_data
 typedef struct rt_display_data *rt_display_data_t;
 
 /**
+ * color palette for RGB332
+ */
+extern uint32_t bpp_lut[256];
+
+/**
  * display rotate.
  */
 void rt_display_rotate(float angle, int w, int h,
                        unsigned char *src, unsigned char *dst,
                        int dst_str, int xcen, int ycen);
+
+/**
+ * color palette for RGB332 and BGR233,default format is RGB332.
+ */
+void rt_display_update_lut(int format);
 
 /**
  * fill image data to fb buffer
@@ -67,12 +105,12 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb,
 /**
  * Configuration win layers.
  */
-rt_err_t rt_display_win_layer_set(rt_device_t device,
-                                  uint8_t   winId,    rt_bool_t winEn,
-                                  uint8_t  *framebuf, uint32_t len,
-                                  uint16_t srcW,      uint16_t srcH,
-                                  uint16_t srcX,      uint16_t srcY,
-                                  uint16_t dstY,      uint16_t dstH);
+rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg);
+
+/**
+ * list win layers.
+ */
+rt_err_t rt_display_win_layers_list(struct rt_display_config **head, struct rt_display_config *tail);
 
 /**
  * Display screen scroll API.
@@ -89,7 +127,7 @@ int rt_display_screen_clear(rt_device_t device);
 /**
  * Display driver sync hook, wait for drv_display finish.
  */
-rt_err_t rt_display_sync_hook(rt_device_t device, uint8_t winid);
+rt_err_t rt_display_sync_hook(rt_device_t device);
 
 /**
  * Display driver update hook, send update command to drv_display.
@@ -99,7 +137,9 @@ rt_err_t rt_display_update_hook(rt_device_t device, uint8_t winid);
 /**
  * Display application initial, initial screen and win layers.
  */
-rt_display_data_t rt_display_init(void);
+rt_display_data_t rt_display_init(struct rt_display_lut *lut0,
+                                  struct rt_display_lut *lut1,
+                                  struct rt_display_lut *lut2);
 
 /**
  * Display application deinitial, free resources.

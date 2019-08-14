@@ -11,6 +11,14 @@
 #include "image_info.h"
 #include "olpc_display.h"
 
+/**
+ * color palette for 1bpp
+ */
+static uint32_t bpp1_lut[2] =
+{
+    0x00000000, 0x00ffffff
+};
+
 /*
  **************************************************************************************************
  *
@@ -400,11 +408,18 @@ uint32_t lv_refr_areas_update_hook(void *par)
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    ret = rt_display_win_layer_set(device, DISP_CLOCK_WIN, RT_TRUE,
-                                   olpc_data->fb, olpc_data->fblen,
-                                   LV_HOR_RES, LV_VER_RES,
-                                   ((WIN_LAYERS_W - LV_HOR_RES) / 2), DISP_CLOCK_YOFFSET,
-                                   DISP_CLOCK_YOFFSET, LV_VER_RES);
+    struct rt_display_config wincfg;
+    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+    wincfg.winId = DISP_CLOCK_WIN;
+    wincfg.fb    = olpc_data->fb;
+    wincfg.fblen = olpc_data->fblen;
+    wincfg.x     = ((WIN_LAYERS_W - LV_HOR_RES) / 2);
+    wincfg.y     = DISP_CLOCK_YOFFSET;
+    wincfg.ylast = DISP_CLOCK_YOFFSET;
+    wincfg.w     = LV_HOR_RES;
+    wincfg.h     = LV_VER_RES;
+
+    ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);
 
     return 0;
@@ -426,12 +441,21 @@ static void olpc_lvgl_clock_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_clock_data *olpc_data;
+    struct rt_display_lut lut0;
 
     g_olpc_data = olpc_data = (struct olpc_clock_data *)rt_malloc(sizeof(struct olpc_clock_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_clock_data));
 
-    olpc_data->disp = rt_display_init();
+    /* init bpp_lut[256] */
+    rt_display_update_lut(FORMAT_RGB_332);
+
+    lut0.winId = DISP_CLOCK_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    lut0.lut  = bpp_lut;
+    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
+
+    olpc_data->disp = rt_display_init(&lut0, RT_NULL, RT_NULL);
     RT_ASSERT(olpc_data->disp != RT_NULL);
 
     olpc_data->disp_event = rt_event_create("display_event", RT_IPC_FLAG_FIFO);

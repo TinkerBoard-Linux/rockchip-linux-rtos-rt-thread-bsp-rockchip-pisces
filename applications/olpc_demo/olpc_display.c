@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <math.h>
 
-#include "color_palette.h"
+//#include "color_palette.h"
 #include "drv_display.h"
 #include "drv_heap.h"
 #include "image_info.h"
@@ -16,17 +16,9 @@
 #define FIRST_STRING        257     // code of first dictionary string
 
 /**
- * color palette for 1bpp
- */
-static uint32_t bpp1_lut[2] =
-{
-    0x00000000, 0x00ffffff
-};
-
-/**
  * color palette for RGB332
  */
-static uint32_t bpp_lut[256] = {0};
+uint32_t bpp_lut[256] = {0};
 
 /**
  * color palette for RGB332 and BGR233,default format is RGB332.
@@ -345,7 +337,7 @@ void rt_display_rotate(float angle, int w, int h, unsigned char *src, unsigned c
 /**
  * color palette for RGB332 and BGR233,default format is RGB332.
  */
-static void rt_display_update_lut(int format)
+void rt_display_update_lut(int format)
 {
     int i = 0;
     int r2, r1, r0, g2, g1, g0, b1, b0;
@@ -415,7 +407,8 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
         }
         else //if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY1)
         {
-            jbig2_decompression(img_info, fb, xVir, xoffset, yoffset);
+            ret = jbig2_decompression(img_info, fb, xVir, xoffset, yoffset);
+            RT_ASSERT(ret == 0);
         }
 
     }
@@ -431,7 +424,17 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
                 }
             }
         }
-        else //if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY1)
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_RGB565)
+        {
+            for (i = 0, y = yoffset; y < yoffset + img_info->h; y++)
+            {
+                for (x = xoffset * 2; x < xoffset * 2 + img_info->w * 2; x++)
+                {
+                    fb[(y * xVir * 2) + x] = img_info->data[i++];
+                }
+            }
+        }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY1)
         {
             RT_ASSERT((xVir % 8) == 0);
 
@@ -474,80 +477,120 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
 }
 
 /**
+ * list win layers.
+ */
+rt_err_t rt_display_win_layers_list(struct rt_display_config **head, struct rt_display_config *tail)
+{
+    RT_ASSERT(tail != RT_NULL);
+
+    if (*head == RT_NULL)
+    {
+        *head = tail;
+    }
+    else
+    {
+        struct rt_display_config *tmp = *head;
+        while (tmp->next != RT_NULL)
+        {
+            tmp = tmp->next;
+        }
+        tmp->next = tail;
+        tail->next = RT_NULL;
+    }
+
+    return RT_EOK;
+}
+
+/**
  * Configuration win layers.
  */
-rt_err_t rt_display_win_layer_set(rt_device_t device,
-                                  uint8_t   winId,    rt_bool_t winEn,
-                                  uint8_t  *framebuf, uint32_t len,
-                                  uint16_t srcW,      uint16_t srcH,
-                                  uint16_t srcX,      uint16_t srcY,
-                                  uint16_t dstY,      uint16_t dstH)
+rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
 {
-    struct rt_device_graphic_info info;
+    rt_err_t ret = RT_EOK;
     struct CRTC_WIN_STATE win_config;
     struct VOP_POST_SCALE_INFO post_scale;
     struct rt_display_data *disp_data = g_disp_data;
-    rt_err_t ret = RT_EOK;
+    struct rt_device_graphic_info info;
+    rt_device_t device = disp_data->device;
+    struct rt_display_config *cfg;
 
-    //rt_kprintf("winID = %d, srcW=%d, srcH=%d, srcX= %d, srcY = %d, dstY=%d, dstH = %d\n",
-    //           winId, srcW, srcH, srcX, srcY, dstY, dstH);
-
-    RT_ASSERT(winId <= 1);
+    RT_ASSERT(wincfg != RT_NULL);
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_memset(&win_config, 0, sizeof(struct CRTC_WIN_STATE));
-
-    win_config.winId = winId;
-    win_config.winEn = winEn;
-    win_config.winUpdate = winEn;
-
-    win_config.zpos = 0;
-
-    win_config.yrgbAddr = (uint32_t)framebuf;
-    win_config.cbcrAddr = (uint32_t)framebuf;
-    win_config.yrgbLength = len;
-    win_config.cbcrLength = len;
-    win_config.xVir = srcW;
-
-    win_config.srcX  = srcX;
-    win_config.srcY  = srcY;
-    win_config.srcW  = srcW;
-    win_config.srcH  = srcH;
-
-    win_config.xLoopOffset = 0;
-    win_config.yLoopOffset = 0;
-
-    win_config.alphaEn = 0;
-    win_config.alphaMode = VOP_ALPHA_MODE_PER_PIXEL;
-    win_config.alphaPreMul = VOP_NON_PREMULT_ALPHA;
-
-    post_scale.srcW = disp_data->xres;
-    post_scale.srcH = dstH;
-    post_scale.dstX = 0;
-    post_scale.dstY = dstY;
-    post_scale.dstW = disp_data->xres;
-    post_scale.dstH = dstH; //dstH * HSCALE
-
-    if (winId == 0)
+    /* post scale set */
+    cfg = wincfg;
+    if (1)
     {
-        win_config.lut = bpp_lut;
-        win_config.format = info.pixel_format;
-    }
-    else if (winId == 1)
-    {
-        //win_config.lut = bpp_lut;
-        //win_config.format = info.pixel_format;
-        win_config.lut = bpp1_lut;
-        win_config.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+        rt_memset(&post_scale, 0, sizeof(struct VOP_POST_SCALE_INFO));
+        post_scale.dstX = 0;
+        post_scale.dstY = 0xffff;
+        post_scale.srcW = disp_data->xres;
+        post_scale.srcH = 0;
+
+        rt_uint16_t dstY2 = 0;
+
+        while (cfg != RT_NULL)
+        {
+            post_scale.dstY = MIN(post_scale.dstY, cfg->y);
+            post_scale.dstY = MIN(post_scale.dstY, cfg->ylast);
+            dstY2 = MAX(dstY2, post_scale.dstY + cfg->h + ABS(cfg->y - cfg->ylast));
+
+            cfg = cfg->next;
+        }
+
+        post_scale.srcH = dstY2 - post_scale.dstY;
+        post_scale.dstW = post_scale.srcW;
+        post_scale.dstH = post_scale.srcH;
+
+        //rt_kprintf("dstX = %d, dstY = %d, dstW = %d, dstH =%d, srcW = %d, srcH =%d\n",
+        //            post_scale.dstX, post_scale.dstY, post_scale.dstW, post_scale.dstH,
+        //            post_scale.srcW,  post_scale.srcH);
+
+        ret = rt_device_control(device,
+                                RK_DISPLAY_CTRL_SET_SCALE, &post_scale);
+        RT_ASSERT(ret == RT_EOK);
     }
 
-    ret = rt_device_control(device,
-                            RK_DISPLAY_CTRL_SET_SCALE, &post_scale);
-    RT_ASSERT(ret == RT_EOK);
-    ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_PLANE, &win_config);
-    RT_ASSERT(ret == RT_EOK);
+    /* win0 set */
+    cfg = wincfg;
+    while (cfg != RT_NULL)
+    {
+        rt_memset(&win_config, 0, sizeof(struct CRTC_WIN_STATE));
+        win_config.winId = cfg->winId;
+        win_config.winEn = 1;
+        win_config.winUpdate = 1;
+
+        win_config.zpos = 0;
+
+        win_config.yrgbAddr = (uint32_t)cfg->fb;
+        win_config.cbcrAddr = (uint32_t)cfg->fb;
+        win_config.yrgbLength = cfg->fblen;
+        win_config.cbcrLength = cfg->fblen;
+        win_config.colorKey   = cfg->colorkey;
+
+        win_config.xVir  = cfg->w;
+        win_config.srcX  = cfg->x;
+        win_config.srcY  = cfg->y;
+        win_config.srcW  = cfg->w;
+        win_config.srcH  = cfg->h;
+
+        win_config.xLoopOffset = 0;
+        win_config.yLoopOffset = 0;
+
+        win_config.alphaEn = 0;
+        win_config.alphaMode = VOP_ALPHA_MODE_PER_PIXEL;
+        win_config.alphaPreMul = VOP_NON_PREMULT_ALPHA;
+
+        win_config.lut    = disp_data->lut[cfg->winId].lut;
+        win_config.format = disp_data->lut[cfg->winId].format;
+
+        ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_PLANE, &win_config);
+        RT_ASSERT(ret == RT_EOK);
+
+        cfg = cfg->next;
+    }
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_COMMIT, NULL);
     RT_ASSERT(ret == RT_EOK);
@@ -639,7 +682,7 @@ rt_err_t rt_display_screen_scroll(rt_device_t device, uint8_t winId, uint32_t mo
 /**
  * Display driver sync hook, wait for drv_display finish.
  */
-rt_err_t rt_display_sync_hook(rt_device_t device, uint8_t winid)
+rt_err_t rt_display_sync_hook(rt_device_t device)
 {
     int ret, i;
     struct display_sync display_sync_data;
@@ -660,31 +703,11 @@ rt_err_t rt_display_sync_hook(rt_device_t device, uint8_t winid)
 }
 
 /**
- * Display driver update hook, send update command to drv_display.
- */
-rt_err_t rt_display_update_hook(rt_device_t device, uint8_t winid)
-{
-    rt_err_t ret;
-
-    struct display_state *state = (struct display_state *)device->user_data;
-    struct CRTC_WIN_STATE *win_state = &(state->crtc_state.win_state[winid]);
-    struct CRTC_WIN_STATE win_config;
-
-    memcpy(&win_config, win_state, sizeof(struct CRTC_WIN_STATE));
-    win_config.winEn = 1;
-    win_config.winId = winid;
-    win_config.winUpdate = 1;
-
-    ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_PLANE, &win_config);
-    RT_ASSERT(ret == RT_EOK);
-
-    return RT_EOK;
-}
-
-/**
  * Display application initial, initial screen and win layers.
  */
-rt_display_data_t rt_display_init(void)
+rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
+                                  struct rt_display_lut *lutB,
+                                  struct rt_display_lut *lutC)
 {
     rt_err_t ret = RT_EOK;
     rt_device_t device;
@@ -709,22 +732,41 @@ rt_display_data_t rt_display_init(void)
     RT_ASSERT(ret == RT_EOK);
     memcpy(&disp_data->info, &info, sizeof(struct rt_device_graphic_info));
 
-    /* init lut */
-    rt_display_update_lut(FORMAT_RGB_332);
-
     /* load lut */
     memset(&lut_state, 0, sizeof(struct crtc_lut_state));
-    lut_state.lut = bpp_lut;
-    lut_state.lut_size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
-    lut_state.win_id = 0;
-    ret = rt_device_control(device, RK_DISPLAY_CTRL_LOAD_LUT, &lut_state);
-    RT_ASSERT(ret == RT_EOK);
 
-    lut_state.lut = bpp1_lut;
-    lut_state.lut_size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-    lut_state.win_id = 1;
-    ret = rt_device_control(device, RK_DISPLAY_CTRL_LOAD_LUT, &lut_state);
-    RT_ASSERT(ret == RT_EOK);
+    if (lutA != RT_NULL)
+    {
+        lut_state.win_id = lutA->winId;
+        lut_state.lut = lutA->lut;
+        lut_state.lut_size = lutA->size;
+        ret = rt_device_control(device, RK_DISPLAY_CTRL_LOAD_LUT, &lut_state);
+        RT_ASSERT(ret == RT_EOK);
+        disp_data->lut[lutA->winId].lut    = lutA->lut;
+        disp_data->lut[lutA->winId].format = lutA->format;
+    }
+
+    if (lutB != RT_NULL)
+    {
+        lut_state.win_id = lutB->winId;
+        lut_state.lut = lutB->lut;
+        lut_state.lut_size = lutB->size;
+        ret = rt_device_control(device, RK_DISPLAY_CTRL_LOAD_LUT, &lut_state);
+        RT_ASSERT(ret == RT_EOK);
+        disp_data->lut[lutB->winId].lut    = lutB->lut;
+        disp_data->lut[lutB->winId].format = lutB->format;
+    }
+
+    if (lutC != RT_NULL)
+    {
+        lut_state.win_id = lutC->winId;
+        lut_state.lut = lutC->lut;
+        lut_state.lut_size = lutC->size;
+        ret = rt_device_control(device, RK_DISPLAY_CTRL_LOAD_LUT, &lut_state);
+        RT_ASSERT(ret == RT_EOK);
+        disp_data->lut[lutC->winId].lut    = lutC->lut;
+        disp_data->lut[lutC->winId].format = lutC->format;
+    }
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_COMMIT, NULL);
     RT_ASSERT(ret == RT_EOK);

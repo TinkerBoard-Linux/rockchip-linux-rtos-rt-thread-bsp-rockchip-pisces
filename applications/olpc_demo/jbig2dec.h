@@ -58,8 +58,7 @@ struct _Jbig2Allocator
 };
 
 /* decoder context */
-Jbig2Ctx *jbig2_ctx_new(Jbig2Allocator *allocator,
-                        Jbig2Options options, Jbig2GlobalCtx *global_ctx, Jbig2ErrorCallback error_callback, void *error_callback_data);
+Jbig2Ctx *jbig2_ctx_new(Jbig2Allocator *allocator);
 Jbig2Allocator *jbig2_ctx_free(Jbig2Ctx *ctx);
 
 ///* submit data to the decoder */
@@ -81,8 +80,6 @@ typedef enum
     JBIG2_FILE_HEADER,
     JBIG2_FILE_SEQUENTIAL_HEADER,
     JBIG2_FILE_SEQUENTIAL_BODY,
-    JBIG2_FILE_RANDOM_HEADERS,
-    JBIG2_FILE_RANDOM_BODIES,
     JBIG2_FILE_EOF
 } Jbig2FileState;
 
@@ -125,9 +122,8 @@ void *jbig2_realloc(Jbig2Allocator *allocator, void *p, size_t size, size_t num)
 
 #define jbig2_new(ctx, t, size) ((t *)jbig2_alloc(ctx->allocator, size, sizeof(t)))
 
-#define jbig2_renew(ctx, p, t, size) ((t *)jbig2_realloc(ctx->allocator, (p), size, sizeof(t)))
+//#define jbig2_renew(ctx, p, t, size) ((t *)jbig2_realloc(ctx->allocator, (p), size, sizeof(t)))
 
-int jbig2_error(Jbig2Ctx *ctx, Jbig2Severity severity, int32_t seg_idx, const char *fmt, ...);
 
 /* The word stream design is a compromise between simplicity and
 trying to amortize the number of method calls. Each ::get_next_word
@@ -142,8 +138,6 @@ struct _Jbig2WordStream
 };
 Jbig2WordStream *jbig2_word_stream_buf_new(Jbig2Ctx *ctx, const unsigned char *data, size_t size);
 
-void jbig2_word_stream_buf_free(Jbig2Ctx *ctx, Jbig2WordStream *ws);
-
 typedef enum
 {
     JBIG2_COMPOSE_OR = 0,
@@ -153,13 +147,10 @@ typedef enum
     JBIG2_COMPOSE_REPLACE = 4
 } Jbig2ComposeOp;
 
-//Jbig2Image *jbig2_image_new(Jbig2Ctx *ctx, uint32_t width, uint32_t height, rt_uint8_t *fb);
-Jbig2Image *jbig2_image_new(Jbig2Ctx *ctx, uint32_t width, uint32_t height, uint32_t flag);
 void jbig2_image_release(Jbig2Ctx *ctx, Jbig2Image *image);
 Jbig2Image *jbig2_image_reference(Jbig2Ctx *ctx, Jbig2Image *image);
 void jbig2_image_free(Jbig2Ctx *ctx, Jbig2Image *image);
 void jbig2_image_clear(Jbig2Ctx *ctx, Jbig2Image *image, int value);
-int jbig2_image_compose(Jbig2Ctx *ctx, Jbig2Image *dst, Jbig2Image *src, int x, int y, Jbig2ComposeOp op);
 
 struct _Jbig2Segment
 {
@@ -175,7 +166,6 @@ struct _Jbig2Segment
 
 Jbig2Segment *jbig2_parse_segment_header(Jbig2Ctx *ctx, uint8_t *buf, size_t buf_size, size_t *p_header_size);
 int jbig2_parse_segment(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data, rt_uint8_t *fb, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset);
-void jbig2_free_segment(Jbig2Ctx *ctx, Jbig2Segment *segment);
 uint32_t jbig2_get_uint32(const unsigned char *bptr);
 int16_t jbig2_get_int16(const unsigned char *bptr);
 
@@ -188,8 +178,6 @@ typedef struct
     Jbig2ComposeOp op;
     uint8_t flags;
 } Jbig2RegionSegmentInfo;
-
-void jbig2_get_region_segment_info(Jbig2RegionSegmentInfo *info, const uint8_t *segment_data);
 
 typedef enum
 {
@@ -217,7 +205,6 @@ struct _Jbig2Page
 int jbig2_page_info(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data, uint32_t flag);
 //int jbig2_end_of_stripe(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data);
 int jbig2_end_of_page(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data);
-int jbig2_page_add_result(Jbig2Ctx *ctx, Jbig2Page *page, Jbig2Image *src, uint32_t x, uint32_t y, Jbig2ComposeOp op);
 
 typedef struct _Jbig2ArithState Jbig2ArithState;
 
@@ -238,19 +225,15 @@ struct _Jbig2ArithState
 /* An arithmetic coding context is stored as a single byte, with the
 index in the low order 7 bits (actually only 6 are used), and the
 MPS in the top bit. */
-typedef unsigned char Jbig2ArithCx;
 
 /* allocate and initialize a new arithmetic coding state */
 Jbig2ArithState *jbig2_arith_new(Jbig2Ctx *ctx, Jbig2WordStream *ws);
 
 /* decode a bit */
-char jbig2_arith_decode(Jbig2ArithState *as, Jbig2ArithCx *pcx, int *code);
+char jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx, int *code);
 
 typedef struct
 {
-    uint8_t MMR;
-    /* GBW */
-    /* GBH */
     int GBTEMPLATE;
     uint8_t TPGDON;
     uint8_t USESKIP;
@@ -258,7 +241,4 @@ typedef struct
     int8_t gbat[8];
 } Jbig2GenericRegionParams;
 
-int jbig2_generic_stats_size(Jbig2Ctx *ctx, int template);
-int jbig2_decode_generic_region(Jbig2Ctx *ctx, Jbig2Segment *segment, const Jbig2GenericRegionParams *params, Jbig2ArithState *as, Jbig2Image *image, Jbig2ArithCx *GB_stats, rt_uint8_t *fb, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset);
-int jbig2_immediate_generic_region(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data, rt_uint8_t *fb, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset, rt_int32_t flag);
 int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset);
