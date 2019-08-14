@@ -93,9 +93,6 @@ typedef struct
 #define TP_INT_PIN 99       /* GPIO0D4*/
 #define TP_RST_PIN 98       /* GPIO0D3*/
 
-#define S3706_ADDR          (0x20)
-#define MAX_FINGER_NUM      (0x0A)
-
 typedef enum IRQ_TRIGGER_REASON
 {
     IRQ_IGNORE      = 0x00,
@@ -111,9 +108,9 @@ typedef enum IRQ_TRIGGER_REASON
 } irq_reason;
 
 /* bit operation */
-#define SET_BIT(data, flag) ((data) |= (flag))
-#define CLR_BIT(data, flag) ((data) &= ~(flag))
-#define CHK_BIT(data, flag) ((data) & (flag))
+#define TP_SET_BIT(data, flag) ((data) |= (flag))
+#define TP_CLR_BIT(data, flag) ((data) &= ~(flag))
+#define TP_CHK_BIT(data, flag) ((data) & (flag))
 
 #ifndef min  //mod by prife
 #define min(x,y) (x<y?x:y)
@@ -122,11 +119,30 @@ typedef enum IRQ_TRIGGER_REASON
 #define max(x,y) (x<y?y:x)
 #endif
 
-extern touch_driver_t s3706_driver;
+#define S3706_ADDR          (0x20)
+#define MAX_FINGER_NUM      (0x0A)
 
-rt_err_t s3706_touch_init(rt_device_t dev);
-rt_err_t s3706_touch_read(uint16_t slaveaddr, void *cmd_buf, size_t cmd_len, void *data_buf, size_t data_len);
-rt_err_t s3706_touch_write(uint16_t slaveaddr, uint16_t regaddr, size_t cmd_len, uint32_t data_buf_arg, size_t data_len);
-uint32_t s3706_trigger_reason(int32_t gesture_enable, int32_t is_suspended);
-void s3706_touch_handle();
+#define POINT_INFO_LEN      (sizeof(struct point_info))
+#define MQ_MEM_POOL_LEN     (50*POINT_INFO_LEN)
+
+typedef struct
+{
+    struct rt_touch_device parent;
+
+    struct rt_i2c_bus_device *i2c_bus;
+    s3706_reg_t reg;
+
+    rt_uint32_t addr;
+    rt_uint32_t max_finger;
+
+    rt_sem_t    irq_sem;
+
+    char point_buf[8 * MAX_FINGER_NUM];
+    struct point_info points[MAX_FINGER_NUM];
+
+    struct rt_messagequeue tp_mq; /* messasge queue structure */
+    rt_uint8_t tp_msg_pool[MQ_MEM_POOL_LEN]; /* mem pool for message queue */
+
+    rt_mutex_t          read_mutex;
+} touch_device_t;
 

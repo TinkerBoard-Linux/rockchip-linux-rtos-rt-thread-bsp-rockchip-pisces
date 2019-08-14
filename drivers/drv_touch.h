@@ -16,9 +16,9 @@
 #include <stdint.h>
 #include <rtdevice.h>
 
-#define TP_DEBUG 0
+//#define TP_DEBUG    1
 
-#if TP_DEBUG
+#ifdef TP_DEBUG
 #define tp_dbg(...) \
     do { \
         rt_kprintf("%s: ", __func__);    \
@@ -100,36 +100,6 @@ struct touch_state
     uint8_t padding;
 };
 
-typedef struct
-{
-    rt_err_t (*init)();
-    rt_size_t (*read)(rt_device_t dev, rt_off_t pos, void *buffer, rt_size_t size);
-    rt_err_t (*control)(rt_device_t dev, int cmd, void *args);
-    int32_t (*get_chip_info)();                                                     /*return 0:success;other:failed*/
-    int32_t (*mode_switch)(int32_t mode, int32_t flag);                            /*return 0:success;other:failed*/
-    int32_t (*get_touch_points)(struct point_info *points, int32_t max_num);          /*return point bit-map*/
-    //int32_t   (*get_gesture_info)     (struct gesture_info * gesture);            /*return 0:success;other:failed*/
-    int32_t (*ftm_process)();                                                       /*ftm boot mode process*/
-    //int32_t  (*get_vendor)           (struct panel_info  *panel_data);           /*distingush which panel we use, (TRULY/OFLIM/BIEL/TPK)*/
-    int32_t (*reset)();                                                             /*Reset Touchpanel*/
-    int32_t (*reinit_device)();
-    int32_t (*power_control)(int32_t enable);                                        /*return 0:success;other:abnormal, need to jump out*/
-    int32_t (*reset_gpio_control)(int32_t enable);                                   /*used for reset gpio*/
-    uint32_t (*trigger_reason)(int32_t gesture_enable, int32_t is_suspended);             /*clear innterrupt reg && detect irq trigger reason*/
-    void (*touch_handle)();
-} touchpanel_ops_t;
-
-typedef struct
-{
-    char               *name;
-    rt_sem_t            isr_sem;
-    rt_sem_t            ex_sem;
-    rt_mutex_t          read_mutex;
-    touchpanel_ops_t    *ops;
-    void                *user_data;
-    rt_device_t         touch_device;
-} touch_driver_t;
-
 struct point_info
 {
     uint16_t x;
@@ -140,7 +110,34 @@ struct point_info
     uint8_t  status;
 };
 
-int32_t touch_get_state(struct touch_state *state);
-void touch_thread_entry(void *parameter);
+struct rt_touch_device;
+
+/**
+ * touch operations
+ */
+struct rt_touch_ops
+{
+    rt_err_t (*open)(struct rt_touch_device *touch_device, rt_uint16_t oflag);
+    rt_err_t (*close)(struct rt_touch_device *touch_device);
+    rt_size_t (*read)(struct rt_touch_device *touch_device, rt_off_t pos, void *buffer, rt_size_t size);
+    rt_err_t (*control)(struct rt_touch_device *touch_device, int cmd, void *arg);
+};
+
+/**
+ * touch device
+ */
+struct rt_touch_device
+{
+    struct rt_device parent;
+    const struct rt_touch_ops *ops;
+};
+
+/* Exported functions ------------------------------------------------------- */
+
+rt_err_t rt_hw_touch_register(struct rt_touch_device *touch,
+                              const char *name,
+                              rt_uint32_t flag,
+                              void *data);
 
 #endif /* __DRV_TOUCH_H__ */
+
