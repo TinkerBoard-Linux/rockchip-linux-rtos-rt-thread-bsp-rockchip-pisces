@@ -51,6 +51,12 @@ menu "Enable DSP"
         bool "Enable firmware loader to dsp"
         default n
 
+        if RT_USING_DSPFW_LOADER
+        config RT_USING_DSPFW_BUILTIN
+            bool "Store firmware data in builtin"
+            default y
+        endif
+
     config RT_USING_DSP_TRACE
         bool "Enable dsp send trace to cm4"
         default n
