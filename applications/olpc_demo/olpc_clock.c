@@ -1246,6 +1246,9 @@ static void olpc_clock_thread(void *p)
 #if defined(RT_USING_TOUCH)
     olpc_data->touch_dev = rt_device_find("s3706");
     RT_ASSERT(olpc_data->touch_dev != RT_NULL);
+
+    ret = rt_device_open(olpc_data->touch_dev, RT_DEVICE_FLAG_RDWR);
+    RT_ASSERT(ret == RT_EOK);
 #endif
 
     olpc_data->disp_event = rt_event_create("display_event", RT_IPC_FLAG_FIFO);
@@ -1296,17 +1299,11 @@ static void olpc_clock_thread(void *p)
  */
 int olpc_clock_app_init(void)
 {
-    rt_thread_t rtt_clock, rtt_touch;
+    rt_thread_t rtt_clock;
 
     rtt_clock = rt_thread_create("olpcclock", olpc_clock_thread, RT_NULL, 2048 * 4, 5, 10);
     RT_ASSERT(rtt_clock != RT_NULL);
     rt_thread_startup(rtt_clock);
-
-#if defined(RT_USING_TOUCH)
-    rtt_touch = rt_thread_create("touch", touch_thread_entry, RT_NULL, 1024, 10, 20);
-    RT_ASSERT(rtt_touch != RT_NULL);
-    rt_thread_startup(rtt_touch);
-#endif
 
     return RT_EOK;
 }
