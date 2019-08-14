@@ -11,6 +11,6 @@ config RT_USING_PRIVATE_TEST
         default n
     endif
 
-source "$BSP_DIR/../rockchip-common/tests/Kconfig"
+source "$BSP_DIR/../common/tests/Kconfig"
 
 endmenu
