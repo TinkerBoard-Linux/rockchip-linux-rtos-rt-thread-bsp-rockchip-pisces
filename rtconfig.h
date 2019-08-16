@@ -63,7 +63,7 @@
 /* RT_USING_INTERRUPT_INFO is not set */
 #define RT_USING_CONSOLE
 #define RT_CONSOLEBUF_SIZE 128
-#define RT_CONSOLE_DEVICE_NAME "uart1"
+#define RT_CONSOLE_DEVICE_NAME "uart0"
 #define RT_VER_NUM 0x30103
 #define ARCH_ARM
 #define ARCH_ARM_CORTEX_M
@@ -99,33 +99,7 @@
 
 /* Device virtual file system */
 
-#define RT_USING_DFS
-#define DFS_USING_WORKDIR
-#define DFS_FILESYSTEMS_MAX 2
-#define DFS_FILESYSTEM_TYPES_MAX 2
-#define DFS_FD_MAX 16
-#define RT_USING_DFS_MNTTABLE
-#define RT_USING_DFS_ELMFAT
-
-/* elm-chan's FatFs, Generic FAT Filesystem Module */
-
-#define RT_DFS_ELM_CODE_PAGE 437
-#define RT_DFS_ELM_WORD_ACCESS
-/* RT_DFS_ELM_USE_LFN_0 is not set */
-/* RT_DFS_ELM_USE_LFN_1 is not set */
-/* RT_DFS_ELM_USE_LFN_2 is not set */
-#define RT_DFS_ELM_USE_LFN_3
-#define RT_DFS_ELM_USE_LFN 3
-#define RT_DFS_ELM_MAX_LFN 255
-#define RT_DFS_ELM_DRIVES 2
-#define RT_DFS_ELM_MAX_SECTOR_SIZE 4096
-/* RT_DFS_ELM_USE_ERASE is not set */
-#define RT_DFS_ELM_REENTRANT
-#define RT_USING_DFS_DEVFS
-/* RT_USING_DFS_ROMFS is not set */
-/* RT_USING_DFS_RAMFS is not set */
-/* RT_USING_DFS_UFFS is not set */
-/* RT_USING_DFS_JFFS2 is not set */
+/* RT_USING_DFS is not set */
 
 /* Device Drivers */
 
@@ -173,11 +147,6 @@
 
 #define RT_USING_LIBC
 /* RT_USING_PTHREADS is not set */
-#define RT_USING_POSIX
-/* RT_USING_POSIX_MMAP is not set */
-/* RT_USING_POSIX_TERMIOS is not set */
-/* RT_USING_POSIX_AIO is not set */
-/* RT_USING_MODULE is not set */
 
 /* Network */
 
@@ -218,7 +187,6 @@
 /* PKG_CMBACKTRACE_PRINT_CHINESE is not set */
 /* RT_USING_LOGTRACE is not set */
 /* RT_USING_RYM is not set */
-/* RT_USING_RZM is not set */
 /* RT_USING_ULOG is not set */
 /* RT_USING_UTEST is not set */
 
@@ -230,30 +198,6 @@
 /* RT-Thread Benchmarks */
 
 /* RT_USING_BENCHMARK is not set */
-
-/* Bluetooth */
-
-/* BT_ENABLED is not set */
-
-/* examples bluetooth */
-
-/* Bluetooth examlpes */
-
-/* Example 'BT API TEST' Config */
-
-/* BT_API_TEST is not set */
-
-/* Example 'BT DISCOVERY' Config */
-
-/* BT_DISCOVERY_EXAMPLES is not set */
-
-/* Example 'A2DP SINK' Config */
-
-/* A2DP_SINK_EXAMPLE is not set */
-
-/* Example 'HFP CLIENT' Config */
-
-/* HFP_CLIENT_EXAMPLE is not set */
 /* RT_USING_PLAYER is not set */
 /* RT_USING_PKGS is not set */
 
@@ -262,7 +206,7 @@
 /* IS_FPGA is not set */
 #define RT_USING_BOARD_M1_EVB
 /* RT_USING_BOARD_FPGA is not set */
-#define M4_JTAG_ENABLE
+/* M4_JTAG_ENABLE is not set */
 /* DSP_JTAG_ENABLE is not set */
 
 /* RT-Thread rockchip common drivers */
@@ -278,8 +222,8 @@
 #define RT_LARGE_MALLOC_THRRESH 512
 /* RT_USING_PANEL_GC9306_CTC28 is not set */
 /* RT_USING_PANEL_FPGA_LVDS is not set */
-#define RT_USING_PANEL_SS
-/* RT_USING_PANEL_S6E3FC2X01 is not set */
+/* RT_USING_PANEL_SS is not set */
+#define RT_USING_PANEL_S6E3FC2X01
 /* RT_USING_PANEL_S6E3HC2_X1 is not set */
 /* RT_USING_PANEL_S6E3HC2_X4 is not set */
 /* RT_USING_PANEL_ST7703_DS is not set */
@@ -302,15 +246,19 @@
 /* RT_USING_RGB is not set */
 #define RT_USING_VOP
 #define RT_USING_DSI
+
+/* Enable DSP */
+
 #define RT_USING_DSP
 /* RT_USING_DSPFW_LOADER is not set */
 /* RT_USING_DSP_TRACE is not set */
+#define RT_DSP_UART_PORT -1
 
 /* Enable UART */
 
 #define RT_USING_UART
 #define RT_USING_UART0
-#define RT_USING_UART1
+/* RT_USING_UART1 is not set */
 
 /* Enable I2C */
 
@@ -330,18 +278,24 @@
 #define RT_USING_I2STDM
 #define RT_USING_PDM
 #define RT_USING_VAD
+#define RT_USING_TOUCH
 
 /* RT-Thread bsp test case */
 
-/* RT_USING_TC is not set */
 /* RT_USING_PRIVATE_TEST is not set */
 
 /* RT-Thread Common Test case */
 
+/* RT_USING_TC is not set */
 /* RT_USING_COMMON_TEST is not set */
+
+/* Pisces application */
+
+#define RT_USING_OLPC_DEMO
+#define OLPC_CLOCK_ENABLE
+/* OLPC_EBOOK_ENABLE is not set */
 
 /* RT-Thread application */
 
-/* RT_USING_OLPC_DEMO is not set */
 
 #endif
