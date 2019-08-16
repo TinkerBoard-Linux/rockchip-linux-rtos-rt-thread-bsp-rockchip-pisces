@@ -106,10 +106,6 @@ CONFIG_FINSH_ARG_MAX=10
 # Device virtual file system
 #
 # CONFIG_RT_USING_DFS is not set
-# CONFIG_RT_DFS_ELM_USE_LFN_0 is not set
-# CONFIG_RT_DFS_ELM_USE_LFN_1 is not set
-# CONFIG_RT_DFS_ELM_USE_LFN_2 is not set
-# CONFIG_RT_DFS_ELM_USE_LFN_3 is not set
 
 #
 # Device Drivers
@@ -313,6 +309,7 @@ CONFIG_RT_USING_I2STDM=y
 CONFIG_RT_USING_PDM=y
 CONFIG_RT_USING_VAD=y
 CONFIG_RT_USING_TOUCH=y
+CONFIG_RT_USING_TOUCH_ASYNC=y
 
 #
 # RT-Thread bsp test case
@@ -329,8 +326,8 @@ CONFIG_RT_USING_TOUCH=y
 # Pisces application
 #
 CONFIG_RT_USING_OLPC_DEMO=y
-# CONFIG_OLPC_CLOCK_ENABLE is not set
-CONFIG_OLPC_EBOOK_ENABLE=y
+CONFIG_OLPC_CLOCK_ENABLE=y
+# CONFIG_OLPC_EBOOK_ENABLE is not set
 
 #
 # RT-Thread application

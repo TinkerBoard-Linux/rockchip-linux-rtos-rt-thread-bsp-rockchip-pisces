@@ -17,11 +17,27 @@
 #ifndef __IMAGE_INFO_H__
 #define __IMAGE_INFO_H__
 
+#ifdef RT_USING_TOUCH
+#include <olpc_touch.h>
+#endif
+
 /**
  * Image info for display
  */
 typedef struct
 {
+#ifdef RT_USING_TOUCH
+    struct olpc_touch_item touch_item;
+    enum olpc_touch_event touch_state;
+    void (*touch_callback)(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter);
+    void *parameter;
+
+    uint8_t touchable;
+    uint8_t touch_id;
+    uint16_t x_scr;
+    uint16_t y_scr;
+#endif
+
     uint8_t  type;
     uint8_t  pixel;
 

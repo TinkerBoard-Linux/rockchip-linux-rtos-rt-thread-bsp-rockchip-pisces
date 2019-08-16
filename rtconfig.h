@@ -279,6 +279,7 @@
 #define RT_USING_PDM
 #define RT_USING_VAD
 #define RT_USING_TOUCH
+#define RT_USING_TOUCH_ASYNC
 
 /* RT-Thread bsp test case */
 
