@@ -405,6 +405,17 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
             ret = rt_display_decompress(img_info, fb, xVir, xoffset, yoffset);
             RT_ASSERT(ret == RT_EOK);
         }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_RGB565)
+        {
+            image_info_t info;
+            rt_memcpy(&info, img_info, sizeof(image_info_t));
+            info.x  *= 2;
+            info.w  *= 2;
+            xVir    *= 2;
+            xoffset *= 2;
+            ret = rt_display_decompress(&info, fb, xVir, xoffset, yoffset);
+            RT_ASSERT(ret == RT_EOK);
+        }
         else //if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY1)
         {
             ret = jbig2_decompression(img_info, fb, xVir, xoffset, yoffset);
