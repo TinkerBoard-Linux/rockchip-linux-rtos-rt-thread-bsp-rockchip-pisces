@@ -230,7 +230,7 @@ MPS in the top bit. */
 Jbig2ArithState *jbig2_arith_new(Jbig2Ctx *ctx, Jbig2WordStream *ws);
 
 /* decode a bit */
-char jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx, int *code);
+//char jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx);
 
 typedef struct
 {

@@ -26,7 +26,21 @@
 #define get_int16(bptr)\
     (((int)get_uint16(bptr) ^ 0x8000) - 0x8000)
 
+#define  OPTI   1
 
+#define CONTEXT_13 0
+
+#if CONTEXT_13
+#define  CONTEXT_VALUE0 0x0efb
+#define  CONTEXT_VALUE1 0x0008
+#define  CONTEXT_VALUE2 0x0200
+#define  CONTEXT_VALUE3 1
+#else //else CONTEXT = 16
+#define  CONTEXT_VALUE0 0x7bf7
+#define  CONTEXT_VALUE1 0x10
+#define  CONTEXT_VALUE2 0x800
+#define  CONTEXT_VALUE3 0
+#endif
 
 
 void
@@ -208,7 +222,7 @@ jbig2_parse_segment_header(Jbig2Ctx *ctx, uint8_t *buf, size_t buf_size, size_t 
     result = (Jbig2Segment *)malloc(sizeof(Jbig2Segment) * 1);
     if (result == NULL)
     {
-        //rt_kprintf("4-----------------------------------------------\n");
+        rt_kprintf("malloc failed : fail to malloc result\n");
         return NULL;
     }
 
@@ -473,6 +487,11 @@ jbig2_page_info(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_dat
         }
 
         page->image = jbig2_new(ctx, Jbig2Image, 1);
+        if (page->image == NULL)
+        {
+            rt_kprintf("malloc failed : fail to malloc page->image\n");
+            return -1;
+        }
         stride = ((page->width - 1) >> 3) + 1;    /* generate a byte-aligned stride */
 
         /* check for integer multiplication overflow */
@@ -480,6 +499,7 @@ jbig2_page_info(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_dat
         {
             jbig2_free(ctx->allocator, page->image);
             page->image = NULL;
+            return -1;
         }
         //page->image->data = jbig2_new(ctx, uint8_t, (size_t)page->height * stride);
         //if (page->image->data == NULL) {
@@ -698,6 +718,103 @@ jbig2_arith_renormd(Jbig2ArithState *as)
     while ((as->A & 0x8000) == 0);
 }
 
+#if OPTI
+char
+jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx) // , int *code
+{
+    uint8_t cx = *pcx;
+    const Jbig2ArithQe *pqe;
+    unsigned int index = cx & 0x7f;
+    char D;
+
+    if (index >= 47)
+    {
+        return 0;
+    }
+    else
+    {
+        pqe = &jbig2_arith_Qe[index];
+    }
+
+    /* Figure E.15 */
+    as->A -= pqe->Qe;
+    if (
+        !((as->C >> 16) < pqe->Qe)
+    )
+    {
+        as->C -= pqe->Qe << 16;
+        if ((as->A & 0x8000) == 0)
+        {
+            /* MPS_EXCHANGE, Figure E.16 */
+            if (as->A < pqe->Qe)
+            {
+                D = 1 - (cx >> 7);
+                *pcx ^= pqe->lps_xor;
+            }
+            else
+            {
+                D = cx >> 7;
+                *pcx ^= pqe->mps_xor;
+            }
+
+#if 0 //OPTI
+            {
+                /* Figure E.18 */
+                do
+                {
+                    if (as->CT == 0)
+                        jbig2_arith_bytein(as);
+                    as->A <<= 1;
+                    as->C <<= 1;
+                    as->CT--;
+                }
+                while ((as->A & 0x8000) == 0);
+            }
+#else
+            jbig2_arith_renormd(as);
+#endif
+            return D;
+        }
+        else
+        {
+            return cx >> 7;
+        }
+    }
+    else
+    {
+        /* LPS_EXCHANGE, Figure E.17 */
+        if (as->A < pqe->Qe)
+        {
+            as->A = pqe->Qe;
+            D = cx >> 7;
+            *pcx ^= pqe->mps_xor;
+        }
+        else
+        {
+            as->A = pqe->Qe;
+            D = 1 - (cx >> 7);
+            *pcx ^= pqe->lps_xor;
+        }
+#if 0 //OPTI
+        {
+            /* Figure E.18 */
+            do
+            {
+                if (as->CT == 0)
+                    jbig2_arith_bytein(as);
+                as->A <<= 1;
+                as->C <<= 1;
+                as->CT--;
+            }
+            while ((as->A & 0x8000) == 0);
+        }
+#else
+        jbig2_arith_renormd(as);
+#endif
+        return D;
+    }
+}
+#else
 char
 jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx, int *code)
 {
@@ -736,7 +853,23 @@ jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx, int *code)
                 D = cx >> 7;
                 *pcx ^= pqe->mps_xor;
             }
+
+#if 0 //OPTI
+            {
+                /* Figure E.18 */
+                do
+                {
+                    if (as->CT == 0)
+                        jbig2_arith_bytein(as);
+                    as->A <<= 1;
+                    as->C <<= 1;
+                    as->CT--;
+                }
+                while ((as->A & 0x8000) == 0);
+            }
+#else
             jbig2_arith_renormd(as);
+#endif
             *code = 0;
             return D;
         }
@@ -761,11 +894,27 @@ jbig2_arith_decode(Jbig2ArithState *as, uint8_t *pcx, int *code)
             D = 1 - (cx >> 7);
             *pcx ^= pqe->lps_xor;
         }
+#if 0 //OPTI
+        {
+            /* Figure E.18 */
+            do
+            {
+                if (as->CT == 0)
+                    jbig2_arith_bytein(as);
+                as->A <<= 1;
+                as->C <<= 1;
+                as->CT--;
+            }
+            while ((as->A & 0x8000) == 0);
+        }
+#else
         jbig2_arith_renormd(as);
+#endif
         *code = 0;
         return D;
     }
 }
+#endif
 
 void//
 jbig2_image_free(Jbig2Ctx *ctx, Jbig2Image *image)
@@ -833,11 +982,17 @@ jbig2_parse_segment(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment
 
         /* Table 34 */
         image = jbig2_new(ctx, Jbig2Image, 1);
+        if (NULL == image)
+        {
+            rt_kprintf("malloc failed : fail to malloc image\n");
+            return -1;
+        }
         stride = ((width - 1) >> 3) + 1;
 
         if (height > (INT32_MAX / stride))
         {
             jbig2_free(ctx->allocator, image);
+            image = NULL;
             return -1;
         }
         //if (image->data == NULL) {
@@ -850,12 +1005,31 @@ jbig2_parse_segment(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment
         image->stride = stride;
         image->refcount = 1;
 
+#if CONTEXT_13
+        stats_size = 1 << 13;
+#else
         stats_size = 1 << 16;
+#endif
         GB_stats = jbig2_new(ctx, uint8_t, stats_size);
+        if (NULL == GB_stats)
+        {
+            rt_kprintf("malloc failed : fail to malloc GB_stats\n");
+            return -1;
+        }
         memset(GB_stats, 0, stats_size);
 
         ws = jbig2_word_stream_buf_new(ctx, segment_data + offset, segment->data_length - offset);
+        if (NULL == ws)
+        {
+            rt_kprintf("malloc failed : fail to malloc ws\n");
+            return -1;
+        }
         as = jbig2_arith_new(ctx, ws);
+        if (NULL == as)
+        {
+            rt_kprintf("malloc failed : fail to malloc as\n");
+            return -1;
+        }
 
         code = -1;
         if (gbat[0] == +3 && gbat[1] == -1 && gbat[2] == -3 && gbat[3] == -1 && gbat[4] == +2 && gbat[5] == -2 && gbat[6] == -2 && gbat[7] == -2)
@@ -878,13 +1052,23 @@ jbig2_parse_segment(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment
                 uint32_t padded_width = (GBW + 7) & -8;
                 int code_t = 0;
 
+#if CONTEXT_13
+                line_m1 = line1 ? (line1[0]) : 0;
+                line_m2 = line2 ? line2[0] << 4 : 0;
+                CONTEXT = ((line_m1 >> 1) & 0x1f8) | (line_m2 & 0x1e00);
+#else
                 line_m1 = line1 ? line1[0] : 0;
                 line_m2 = line2 ? line2[0] << 6 : 0;
                 CONTEXT = (line_m1 & 0x7f0) | (line_m2 & 0xf800);
+#endif
 
                 for (x = 0; x < padded_width; x += 8)
                 {
+#if OPTI
                     unsigned char result = 0;
+#else
+                    unsigned char result = 0;
+#endif
                     int x_minor;
                     int minor_width = GBW - x > 8 ? 8 : GBW - x;
 
@@ -892,19 +1076,114 @@ jbig2_parse_segment(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment
                         line_m1 = (line_m1 << 8) | (x + 8 < GBW ? line1[(x >> 3) + 1] : 0);
 
                     if (line2)
+                    {
+#if CONTEXT_13
+                        line_m2 = (line_m2 << 8) | (x + 8 < GBW ? line2[(x >> 3) + 1] << 4 : 0);
+#else
                         line_m2 = (line_m2 << 8) | (x + 8 < GBW ? line2[(x >> 3) + 1] << 6 : 0);
+#endif
+                    }
+#if OPTI
+                    {
+                        if (minor_width == 8)
+                        {
+                            uint8_t bit;
+                            // 0
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[0] | ((line_m1 >> 7) & 0x10) | ((line_m2 >> 7) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (7 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (7)) & CONTEXT_VALUE2);
+                            result = (bit << 7);
+                            // 1
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[1] | ((line_m1 >> 6) & 0x10) | ((line_m2 >> 6) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (6 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (6)) & CONTEXT_VALUE2);
+                            result |= (bit << 6);
+                            // 2
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[2] | ((line_m1 >> 5) & 0x10) | ((line_m2 >> 5) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (5 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (5)) & CONTEXT_VALUE2);
+                            result |= (bit << 5);
+                            // 3
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[3] | ((line_m1 >> 4) & 0x10) | ((line_m2 >> 4) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (4 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (4)) & CONTEXT_VALUE2);
+                            result |= (bit << 4);
+                            // 4
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[4] | ((line_m1 >> 3) & 0x10) | ((line_m2 >> 3) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (3 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (3)) & CONTEXT_VALUE2);
+                            result |= (bit << 3);
+                            // 5
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[5] | ((line_m1 >> 2) & 0x10) | ((line_m2 >> 2) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (2 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (2)) & CONTEXT_VALUE2);
+                            result |= (bit << 2);
+                            // 6
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[6] | ((line_m1 >> 1) & 0x10) | ((line_m2 >> 1) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (1 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2 >> (1)) & CONTEXT_VALUE2);
+                            result |= (bit << 1);
+                            // 7
+                            bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                            //if (code_t)
+                            //  code = -1;
+                            //code = code_t*2 - 1;
+                            //CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit[7] | ((line_m1) & 0x10) | ((line_m2 ) & 0x800);
+                            CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (0 + CONTEXT_VALUE3)) & CONTEXT_VALUE1) | ((line_m2)& CONTEXT_VALUE2);
+                            result |= (bit);
+                            //result = (bit[0] << 7) | (bit[1] << 6) | (bit[2] << 5) | (bit[3] << 4) | (bit[4] << 3) | (bit[5] << 2) | (bit[6] << 1) | (bit[7]) ;
+                        }
+                        else
+                        {
+                            for (x_minor = 0; x_minor < minor_width; x_minor++)
+                            {
+                                uint8_t bit;
 
+                                bit = jbig2_arith_decode(as, &GB_stats[CONTEXT]);
+                                if (code_t)
+                                    return -1;
+                                result |= bit << (7 - x_minor);
+                                CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (7 + CONTEXT_VALUE3 - x_minor)) & CONTEXT_VALUE1) | ((line_m2 >> (7 - x_minor)) & CONTEXT_VALUE2);
+                            }
+                        }
+                    }
+#else
                     for (x_minor = 0; x_minor < minor_width; x_minor++)
                     {
                         uint8_t bit;
 
                         bit = jbig2_arith_decode(as, &GB_stats[CONTEXT], &code_t);
                         if (code_t)
-                            code = -1;
+                            return -1;
                         result |= bit << (7 - x_minor);
-                        CONTEXT = ((CONTEXT & 0x7bf7) << 1) | bit | ((line_m1 >> (7 - x_minor)) & 0x10) | ((line_m2 >> (7 - x_minor)) & 0x800);
+                        CONTEXT = ((CONTEXT & CONTEXT_VALUE0) << 1) | bit | ((line_m1 >> (7 + CONTEXT_VALUE3 - x_minor)) & CONTEXT_VALUE1) | ((line_m2 >> (7 - x_minor)) & CONTEXT_VALUE2);
                     }
-                    fb[(y + yoffset) * (xVir >> 3) + ((x + xoffset) >> 3)] |= result;
+#endif
+                    if (result != 0)
+                    {
+                        fb[(y + yoffset) * (xVir >> 3) + ((x + xoffset) >> 3)] |= result;
+                    }
                 }
                 line2 = line1;
                 line1 = fb + (xVir / 8) * y;
@@ -926,7 +1205,7 @@ jbig2_parse_segment(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment
     }
     else if (49 == val)
     {
-        return jbig2_end_of_page(ctx, segment, segment_data);
+        ctx->pages[ctx->current_page].state = JBIG2_PAGE_COMPLETE;
     }
     else if (51 == val)
     {
@@ -949,12 +1228,12 @@ jbig2_data_in(Jbig2Ctx *ctx, const unsigned char *data, size_t size, rt_uint8_t 
         }
         while (buf_size < size);
 
-        //rt_kprintf("buf_size == %d; size = %d\n", buf_size, size);
-
         ctx->buf = jbig2_new(ctx, unsigned char, buf_size);
         //(unsigned char*)malloc(sizeof(unsigned char) * 2048);
         if (ctx->buf == NULL)
         {
+            rt_kprintf("malloc failed: fail to malloc ctx->buf.\n");
+            RT_ASSERT(0);
             return -1;
         }
         ctx->buf_size = buf_size;
@@ -979,6 +1258,8 @@ jbig2_data_in(Jbig2Ctx *ctx, const unsigned char *data, size_t size, rt_uint8_t 
             //buf = (unsigned char*)malloc(sizeof(unsigned char) * buf_size);
             if (buf == NULL)
             {
+                rt_kprintf("malloc failed: fail to malloc buf.\n");
+                RT_ASSERT(0);
                 return -1;
             }
             memcpy(buf, ctx->buf + ctx->buf_rd_ix, ctx->buf_wr_ix - ctx->buf_rd_ix);
@@ -1002,10 +1283,18 @@ jbig2_data_in(Jbig2Ctx *ctx, const unsigned char *data, size_t size, rt_uint8_t 
                 return 0;
             const unsigned char jbig2_id_string[8] = { 0x97, 0x4a, 0x42, 0x32, 0x0d, 0x0a, 0x1a, 0x0a };
             if (memcmp(ctx->buf + ctx->buf_rd_ix, jbig2_id_string, 8))
+            {
+                jbig2_free(ctx->allocator, ctx->buf);
+                RT_ASSERT(0);
                 return -1;
+            }
             /* Check for T.88 amendment 2 */
             if ((ctx->buf[ctx->buf_rd_ix + 8] & 0x04) || (ctx->buf[ctx->buf_rd_ix + 8] & 0x08))
+            {
+                jbig2_free(ctx->allocator, ctx->buf);
+                RT_ASSERT(0);
                 return -1;
+            }
             /* D.4.3 */
             if (ctx->buf_wr_ix - ctx->buf_rd_ix < 13)
                 return 0;
@@ -1036,6 +1325,8 @@ jbig2_data_in(Jbig2Ctx *ctx, const unsigned char *data, size_t size, rt_uint8_t 
             if (code < 0)
             {
                 ctx->state = JBIG2_FILE_EOF;
+                jbig2_free(ctx->allocator, ctx->buf);
+                RT_ASSERT(0);
                 return -1;
             }
         }
@@ -1043,6 +1334,9 @@ jbig2_data_in(Jbig2Ctx *ctx, const unsigned char *data, size_t size, rt_uint8_t 
         {
             if (ctx->buf_rd_ix == ctx->buf_wr_ix)
                 return 0;
+
+            jbig2_free(ctx->allocator, ctx->buf);
+            RT_ASSERT(0);
             return -1;
         }
     }
@@ -1148,7 +1442,8 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
 
         if (jbig2_data_in(ctx, buf, n_bytes, fb, xVir, xoffset, yoffset))
         {
-            return -1;
+            printf("error return from decompressing process\n");
+            RT_ASSERT(0);
             break;
         }
     }
