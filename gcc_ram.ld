@@ -35,6 +35,9 @@ _system_stack_size = 0x400;
 _code_start_addr = 0x04000000;
 _data_start_off  = 0x1c000000;
 
+_dtcm_start_addr = 0x30200000;
+_dtcm_heap_size  = 0x80000;
+
 SECTIONS
 {
     . = _code_start_addr;
@@ -158,7 +161,7 @@ SECTIONS
 
     }
 
-    .bss :
+    .bss (NOLOAD):
     {
         . = ALIGN(4);
         __bss_start__ = .;
@@ -174,19 +177,31 @@ SECTIONS
         . = ALIGN(4);
         __ramfs_start__ = .;
         . = . + _ram_fs_size;
-        __ramfs_end__ = .;	
+        __ramfs_end__ = .;
     }*/
 
     /* region for large memory allocate */
-    .large :
+    .large (COPY):
     {
         . = ALIGN(4);
         __large_start__ = .;
         . = . + _large_heap_size;
-        __large_end__ = .;  
+        __large_end__ = .;
+    }
+    _stack_start_addr = .;
+
+    /* region for dtcm memory allocate */
+    . = _dtcm_start_addr;
+    .dtcm (COPY):
+    {
+        . = ALIGN(4);
+        __dtcm_start__ = .;
+        . = . + _dtcm_heap_size;
+        __dtcm_end__ = .;
     }
 
-    .stack :
+    . = _stack_start_addr;
+    .stack (COPY):
     {
         . = ALIGN(4);
         _sstack = .;
