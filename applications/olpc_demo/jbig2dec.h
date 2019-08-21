@@ -1,6 +1,5 @@
 #pragma once
 #include <stdint.h>
-//#include <windows.h>
 
 /* warning levels */
 typedef enum
@@ -122,8 +121,6 @@ void *jbig2_realloc(Jbig2Allocator *allocator, void *p, size_t size, size_t num)
 
 #define jbig2_new(ctx, t, size) ((t *)jbig2_alloc(ctx->allocator, size, sizeof(t)))
 
-//#define jbig2_renew(ctx, p, t, size) ((t *)jbig2_realloc(ctx->allocator, (p), size, sizeof(t)))
-
 
 /* The word stream design is a compromise between simplicity and
 trying to amortize the number of method calls. Each ::get_next_word
@@ -201,9 +198,7 @@ struct _Jbig2Page
     Jbig2Image *image;
 };
 
-//int jbig2_page_info(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data, uint8_t *fb);
 int jbig2_page_info(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data, uint32_t flag);
-//int jbig2_end_of_stripe(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data);
 int jbig2_end_of_page(Jbig2Ctx *ctx, Jbig2Segment *segment, const uint8_t *segment_data);
 
 typedef struct _Jbig2ArithState Jbig2ArithState;

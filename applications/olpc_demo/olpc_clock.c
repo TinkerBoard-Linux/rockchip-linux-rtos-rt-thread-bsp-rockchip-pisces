@@ -1321,7 +1321,7 @@ int olpc_clock_app_init(void)
 {
     rt_thread_t rtt_clock;
 
-    rtt_clock = rt_thread_create("olpcclock", olpc_clock_thread, RT_NULL, 2048 * 4, 5, 10);
+    rtt_clock = rt_thread_create("olpcclock", olpc_clock_thread, RT_NULL, 2048, 5, 10);
     RT_ASSERT(rtt_clock != RT_NULL);
     rt_thread_startup(rtt_clock);
 

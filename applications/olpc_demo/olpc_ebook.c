@@ -598,7 +598,7 @@ int olpc_ebook_app_init(void)
 {
     rt_thread_t rtt_ebook;
 
-    rtt_ebook = rt_thread_create("olpcclock", olpc_ebook_thread, RT_NULL, 2048 * 5, 5, 10);
+    rtt_ebook = rt_thread_create("olpcclock", olpc_ebook_thread, RT_NULL, 2048, 5, 10);
     RT_ASSERT(rtt_ebook != RT_NULL);
     rt_thread_startup(rtt_ebook);
 
