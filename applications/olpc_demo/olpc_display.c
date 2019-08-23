@@ -552,8 +552,8 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
         }
 
         post_scale.srcH = dstY2 - post_scale.dstY;
-        post_scale.dstW = post_scale.srcW;
-        post_scale.dstH = post_scale.srcH;
+        post_scale.dstW = post_scale.srcW * WSCALE;
+        post_scale.dstH = post_scale.srcH * HSCALE;
 
         //rt_kprintf("dstX = %d, dstY = %d, dstW = %d, dstH =%d, srcW = %d, srcH =%d\n",
         //            post_scale.dstX, post_scale.dstY, post_scale.dstW, post_scale.dstH,
@@ -650,6 +650,10 @@ rt_err_t rt_display_screen_scroll(rt_device_t device, uint8_t winId, uint32_t mo
     struct display_state *state = (struct display_state *)device->user_data;
     struct CRTC_WIN_STATE win_config, *win_state = &(state->crtc_state.win_state[winId]);
     struct VOP_POST_SCALE_INFO post_scale;
+    struct rt_device_graphic_info info;
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
 
     memcpy(&win_config, win_state, sizeof(struct CRTC_WIN_STATE));
 
@@ -675,8 +679,8 @@ rt_err_t rt_display_screen_scroll(rt_device_t device, uint8_t winId, uint32_t mo
     post_scale.srcH = win_config.srcH;
     post_scale.dstX = 0;
     post_scale.dstY = win_config.srcY;
-    post_scale.dstW = g_disp_data->xres;
-    post_scale.dstH = win_config.srcH;
+    post_scale.dstW = post_scale.srcW * WSCALE;
+    post_scale.dstH = post_scale.srcH * HSCALE;
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_SCALE, &post_scale);
     RT_ASSERT(ret == RT_EOK);
@@ -736,6 +740,10 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     ret = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
     RT_ASSERT(ret == RT_EOK);
 
+    int path = SWITCH_TO_INTERNAL_DPHY;
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_MIPI_SWITCH, &path);
+    RT_ASSERT(ret == RT_EOK);
+
     ret = rt_device_control(device, RK_DISPLAY_CTRL_ENABLE, NULL);
     RT_ASSERT(ret == RT_EOK);
 
@@ -786,8 +794,8 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     ret = rt_display_screen_clear(device);
     RT_ASSERT(ret == RT_EOK);
 
-    disp_data->xres = WIN_SCALED_W;
-    disp_data->yres = WIN_SCALED_H;
+    disp_data->xres = WIN_LAYERS_W;
+    disp_data->yres = WIN_LAYERS_H;
     disp_data->device = device;
     g_disp_data = disp_data;
 
