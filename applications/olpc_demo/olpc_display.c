@@ -620,6 +620,7 @@ int rt_display_screen_clear(rt_device_t device)
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
+    rt_memset(&win_config, 0, sizeof(struct CRTC_WIN_STATE));
     win_config.winEn = 0;
     win_config.winId = 0;
     win_config.winUpdate = 1;
@@ -660,8 +661,6 @@ rt_err_t rt_display_screen_scroll(rt_device_t device, uint8_t winId, uint32_t mo
     win_config.winEn = 1;
     win_config.winId = winId;
     win_config.winUpdate = 1;
-
-    win_config.xVir = srcW;
 
     win_config.xLoopOffset += xoffset;
     if (win_config.xLoopOffset >= srcW)
