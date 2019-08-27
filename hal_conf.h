@@ -65,6 +65,7 @@
 
 #ifdef RT_USING_PM
 #define HAL_PM_MODULE_ENABLED
+#define HAL_PM_CPU_SLEEP_MODULE_ENABLED
 #endif
 
 #ifdef RT_USING_PMU
