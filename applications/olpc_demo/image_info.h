@@ -16,8 +16,10 @@
 
 #ifndef __IMAGE_INFO_H__
 #define __IMAGE_INFO_H__
+#include <rtthread.h>
 
 #ifdef RT_USING_TOUCH
+#include <drv_touch.h>
 #include <olpc_touch.h>
 #endif
 
@@ -29,7 +31,7 @@ typedef struct
 #ifdef RT_USING_TOUCH
     struct olpc_touch_item touch_item;
     enum olpc_touch_event touch_state;
-    void (*touch_callback)(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter);
+    rt_err_t (*touch_callback)(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter);
     void *parameter;
 
     uint8_t touchable;

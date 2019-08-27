@@ -133,6 +133,13 @@ extern image_info_t fingerprint1_info;
 extern image_info_t fingerprint2_info;
 extern image_info_t fingerprint3_info;
 
+static rt_err_t olpc_clock_screen_touch_register(void *parameter);
+static rt_err_t olpc_clock_screen_touch_unregister(void *parameter);
+static rt_err_t olpc_clock_home_touch_register(void *parameter);
+static rt_err_t olpc_clock_home_touch_unregister(void *parameter);
+static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter);
+static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter);
+
 /*
  **************************************************************************************************
  *
@@ -185,13 +192,12 @@ struct olpc_clock_data
     rt_int16_t  msg_ydir;
     rt_int16_t  msg_ylast;
 
-    rt_uint8_t  home_id;
     rt_uint8_t  home_sta;
     rt_uint32_t home_timeout;
 
+    rt_uint8_t  home_id;
+
     rt_uint8_t  fp_id;
-    rt_uint8_t  fp_sta;
-    rt_uint32_t fp_timeout;
     rt_uint32_t fp_lpcnt;
 };
 
@@ -363,24 +369,15 @@ static void olpc_clock_timeout(void *parameter)
         if (olpc_data->home_timeout == 0)
         {
             olpc_data->home_sta = 0;
-            olpc_data->cmd |= UPDATE_HOME;
-            rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-        }
-    }
 
-    // fingerprint on state time out check && fingerprint loop change
-    // fingerprint on state timeout = FP_HOLD_TIME ms
-    // fingerprint loop change every FP_LOOP_TIME ms
-    if (olpc_data->fp_sta == 1)
-    {
-        olpc_data->fp_timeout -= DISP_UPDATE_TIME;
-        if (olpc_data->fp_timeout == 0)
-        {
-            olpc_data->fp_sta = 0;
-            olpc_data->cmd |= UPDATE_FINGERP;
+            olpc_data->cmd |= UPDATE_HOME | UPDATE_FINGERP;
             rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+
+            olpc_clock_home_touch_unregister(olpc_data);
+            olpc_clock_fingerprint_touch_unregister(olpc_data);
         }
 
+        // fingerprint loop change every FP_LOOP_TIME ms
         if (olpc_data->fp_lpcnt > 0)
         {
             if ((olpc_data->ticks % FP_LOOP_TIME) == 0)
@@ -440,8 +437,6 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
     olpc_data->home_timeout = HOME_HOLD_TIME;
 
     olpc_data->fp_id = 0;
-    olpc_data->fp_sta = 1;
-    olpc_data->fp_timeout = FP_HOLD_TIME;
     olpc_data->fp_lpcnt = 0;
 
     olpc_data->cmd = UPDATE_CLOCK | UPDATE_MSG | UPDATE_HOME | UPDATE_FINGERP;
@@ -1009,7 +1004,7 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     xoffset = 0;
     yoffset = 0;
 
-    if (olpc_data->fp_sta == 1)
+    if (olpc_data->home_sta == 1)
     {
         // draw fingerprint img
         img_info = fingerprint_item[olpc_data->fp_id];
@@ -1112,92 +1107,44 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
 /**
  * screen touch.
  */
-static void olpc_clock_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter)
+static rt_err_t olpc_clock_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
 {
+    rt_err_t ret = RT_ERROR;
     struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
 
-    if (event == TOUCH_EVENT_DOWN)
+    switch (event)
     {
-        //rt_kprintf("%s, callback.\n", __func__, touch_id);
-
-        if ((olpc_data->home_sta == 0) || (olpc_data->fp_sta == 0))
+    case TOUCH_EVENT_SHORT_DOWN:
+        if (olpc_data->home_sta == 0)
         {
             olpc_data->home_sta = 1;
+
             olpc_data->home_id  = 8;
-
-            olpc_data->fp_sta = 1;
-            olpc_data->fp_id  = 0;
-
+            olpc_data->fp_id    = 0;
             olpc_data->cmd |= UPDATE_HOME | UPDATE_FINGERP;
             rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-        }
 
-        // reset timer
-        olpc_data->home_timeout = HOME_HOLD_TIME;
-        olpc_data->fp_timeout   = FP_HOLD_TIME;
+            olpc_clock_home_touch_register(parameter);
+            olpc_clock_fingerprint_touch_register(parameter);
+            ret = RT_EOK;
+        }
+        break;
+
+    default:
+        break;
     }
+
+    olpc_data->home_timeout = HOME_HOLD_TIME;   //reset screen on timer
+
+    return ret;
 }
 
-/**
- * home item touch.
- */
-static void olpc_clock_home_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter)
+static rt_err_t olpc_clock_screen_touch_register(void *parameter)
 {
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    if (event == TOUCH_EVENT_DOWN)
-    {
-        //rt_kprintf("%s, home id [%d] callback.\n", __func__, touch_id);
-        if (olpc_data->home_sta == 1)
-        {
-            olpc_data->home_id = touch_id;
-            olpc_data->cmd |= UPDATE_HOME;
-            rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-            // reset timer
-            olpc_data->home_timeout = HOME_HOLD_TIME;
-            olpc_data->fp_timeout   = FP_HOLD_TIME;
-        }
-    }
-}
-
-/**
- * fingerprint touch.
- */
-static void olpc_clock_fingerprint_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter)
-{
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    if (event == TOUCH_EVENT_DOWN)
-    {
-        //rt_kprintf("%s, home id [%d] callback.\n", __func__, touch_id);
-        if (olpc_data->fp_sta == 1)
-        {
-            olpc_data->fp_id  = 0;
-            olpc_data->fp_lpcnt = 6;
-            olpc_data->cmd |= UPDATE_FINGERP;
-            rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-            // reset timer
-            olpc_data->home_timeout = HOME_HOLD_TIME;
-            olpc_data->fp_timeout   = FP_HOLD_TIME;
-        }
-    }
-}
-
-/**
- * touch items regester & init.
- */
-void olpc_clock_touch_initial(void *parameter)
-{
-    rt_err_t     ret;
-    rt_int16_t   i, x, y;
-    image_info_t *img_info;
     struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
     struct rt_device_graphic_info info;
 
-    ret = rt_device_control(olpc_data->disp->device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
 
     /* screen on button key register */
     {
@@ -1207,16 +1154,114 @@ void olpc_clock_touch_initial(void *parameter)
         update_item_coord((struct olpc_touch_item *)(&screen_item.touch_item), 0, 0, 0, 0);
     }
 
+    return RT_EOK;
+}
+
+static rt_err_t olpc_clock_screen_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = &screen_item;
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
+}
+
+/**
+ * home item touch.
+ */
+static rt_err_t olpc_clock_home_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
+{
+    rt_err_t ret = RT_ERROR;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    switch (event)
+    {
+    case TOUCH_EVENT_SHORT_DOWN:
+        olpc_data->home_id = touch_id;
+        olpc_data->cmd |= UPDATE_HOME;
+        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        ret = RT_EOK;
+        break;
+
+    default:
+        break;
+    }
+
+    return ret;
+}
+
+static rt_err_t olpc_clock_home_touch_register(void *parameter)
+{
+    rt_int16_t   i, x, y;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
     /* home button key register */
     {
         x  = HOME_REGION_X + (HOME_REGION_W - HOME_FB_W) / 2;
         y  = HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2;
         for (i = 0; i < 8; i++)
         {
-            register_touch_item((struct olpc_touch_item *)(&home_item[i]->touch_item), (void *)olpc_clock_home_touch_callback, (void *)olpc_data, i);
-            update_item_coord((struct olpc_touch_item *)(&home_item[i]->touch_item), x, y, home_item[i]->x, home_item[i]->y);
+            image_info_t *img_info = home_item[i];
+            register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_clock_home_touch_callback, (void *)olpc_data, i);
+            update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, home_item[i]->x, home_item[i]->y);
         }
     }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_clock_home_touch_unregister(void *parameter)
+{
+    rt_int16_t   i;
+
+    /* home button key register */
+    {
+        for (i = 0; i < 8; i++)
+        {
+            image_info_t *img_info = home_item[i];
+            unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+        }
+    }
+
+    return RT_EOK;
+}
+
+/**
+ * fingerprint touch.
+ */
+static rt_err_t olpc_clock_fingerprint_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
+{
+    rt_err_t ret = RT_ERROR;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    switch (event)
+    {
+    case TOUCH_EVENT_SHORT_DOWN:
+        olpc_data->fp_id  = 0;
+        olpc_data->fp_lpcnt = 6;
+        olpc_data->cmd |= UPDATE_FINGERP;
+        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        ret = RT_EOK;
+        break;
+
+    default:
+        break;
+    }
+
+    return ret;
+}
+
+static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter)
+{
+    rt_int16_t   x, y;
+    image_info_t *img_info;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
 
     /* fingerprint button key register */
     {
@@ -1226,9 +1271,30 @@ void olpc_clock_touch_initial(void *parameter)
         register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_clock_fingerprint_touch_callback, (void *)olpc_data, 0);
         update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
     }
+
+    return RT_EOK;
 }
 
+static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = &fingerprint0_info;
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
+}
+
+/**
+ * touch items regester & init.
+ */
+void olpc_clock_touch_initial(void *parameter)
+{
+    olpc_clock_screen_touch_register(parameter);
+    olpc_clock_home_touch_register(parameter);
+    olpc_clock_fingerprint_touch_register(parameter);
+}
 #endif
+
 /*
  **************************************************************************************************
  *

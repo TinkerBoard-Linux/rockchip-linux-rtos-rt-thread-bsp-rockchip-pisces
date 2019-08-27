@@ -27,24 +27,31 @@ struct olpc_touch_item
 /**
  * Base structure of olpc touch
  */
+enum olpc_touch_event
+{
+    TOUCH_EVENT_UP = 0,
+    TOUCH_EVENT_PROB,
+    TOUCH_EVENT_SHORT_DOWN,
+    TOUCH_EVENT_LONG_DOWN,
+    TOUCH_EVENT_LONG_PRESS,
+    TOUCH_EVENT_MOVE,
+};
+
 struct olpc_touch
 {
     struct olpc_touch_item *touch_list;                 /**< used touch list */
     struct olpc_touch_item touch_header;                /**< touch list header */
 
     struct rt_semaphore     lock;                       /**< semaphore lock */
-};
-
-enum olpc_touch_event
-{
-    TOUCH_EVENT_DOWN = 0,
-    TOUCH_EVENT_UP,
+    enum   olpc_touch_event state;
+    rt_tick_t               tick;
 };
 
 rt_err_t register_touch_item(struct olpc_touch_item *item,
                              void (*entry)(void *parameter),
                              void *parameter,
                              rt_int32_t touch_id);
+rt_err_t unregister_touch_item(struct olpc_touch_item *item);
 
 void update_item_coord(struct olpc_touch_item *item, rt_uint32_t fb_x, rt_uint32_t fb_y,
                        rt_uint32_t x_offset, rt_uint32_t y_offset);

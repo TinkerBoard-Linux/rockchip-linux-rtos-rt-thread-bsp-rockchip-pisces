@@ -76,6 +76,11 @@ extern image_info_t ebook_btn_rightdown_info;
 extern image_info_t ebook_btn_leftup_info;
 extern image_info_t ebook_btn_leftdown_info;
 
+static rt_err_t olpc_ebook_leftbtn_touch_register(void *parameter);
+static rt_err_t olpc_ebook_leftbtn_touch_unregister(void *parameter);
+static rt_err_t olpc_ebook_rightbtn_touch_register(void *parameter);
+static rt_err_t olpc_ebook_rightbtn_touch_unregister(void *parameter);
+
 /*
  **************************************************************************************************
  *
@@ -163,6 +168,9 @@ static void olpc_ebook_timeout(void *parameter)
             olpc_data->btn_sta = 0;
             olpc_data->cmd |= /*UPDATE_PAGE | */UPDATE_BTN;
             rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+
+            olpc_ebook_leftbtn_touch_unregister(parameter);
+            olpc_ebook_rightbtn_touch_unregister(parameter);
         }
 
         // btn key timeout
@@ -396,12 +404,14 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
 /**
  * screen touch.
  */
-static void olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter)
+static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
 {
+    rt_err_t ret = RT_ERROR;
     struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
 
-    if (event == TOUCH_EVENT_DOWN)
+    switch (event)
     {
+    case TOUCH_EVENT_SHORT_DOWN:
         if (olpc_data->btn_sta == 0)
         {
             olpc_data->btn_sta = 1;
@@ -410,63 +420,177 @@ static void olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_touc
             olpc_data->rbtn_num = 0;
             olpc_data->cmd |= /*UPDATE_PAGE | */UPDATE_BTN;
             rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+
+            olpc_ebook_leftbtn_touch_register(parameter);
+            olpc_ebook_rightbtn_touch_register(parameter);
+
+            ret = RT_EOK;
         }
-        olpc_data->btnon_timeout = BTN_HOLD_TIME;   //reset timer
+        break;
+
+    default:
+        break;
     }
+
+    olpc_data->btnon_timeout = BTN_HOLD_TIME; //reset screen on timer
+
+    return ret;
+}
+
+static rt_err_t olpc_ebook_screen_touch_register(void *parameter)
+{
+    image_info_t *img_info = &screen_item;
+    struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* screen on button touch register */
+    {
+        screen_item.w = WIN_LAYERS_W;
+        screen_item.h = WIN_LAYERS_H;
+        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_ebook_screen_touch_callback, (void *)olpc_data, 0);
+        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), 0, 0, 0, 0);
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_ebook_screen_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = &screen_item;
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
 }
 
 /**
  * left button touch.
  */
-static void olpc_ebook_leftbtn_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter)
+static rt_err_t olpc_ebook_leftbtn_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
 {
+    rt_err_t ret = RT_ERROR;
     struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
 
-    if (event == TOUCH_EVENT_DOWN)
+    switch (event)
     {
-        if (olpc_data->btn_sta == 1)
+    case TOUCH_EVENT_SHORT_DOWN:
+
+        olpc_data->lbtn_num  = 1;
+        olpc_data->rbtn_num  = 0;
+
+        if (olpc_data->page_num > 0)
         {
-            olpc_data->lbtn_num  = 1;
-            olpc_data->rbtn_num  = 0;
-
-            if (olpc_data->page_num > 0)
-            {
-                olpc_data->page_num --;
-            }
-
-            olpc_data->btndown_timeout = BTN_DOWN_TIME;
-            olpc_data->cmd |= UPDATE_PAGE | UPDATE_BTN;
-            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+            olpc_data->page_num --;
         }
-        olpc_data->btnon_timeout = BTN_HOLD_TIME;   //reset timer
+
+        olpc_data->btndown_timeout = BTN_DOWN_TIME;
+        olpc_data->cmd |= UPDATE_PAGE | UPDATE_BTN;
+        rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+
+        ret = RT_EOK;
+        break;
+
+    default:
+        break;
     }
+
+    return ret;
+}
+
+static rt_err_t olpc_ebook_leftbtn_touch_register(void *parameter)
+{
+    image_info_t *img_info;
+    struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* right buttons touch register */
+    {
+        rt_uint16_t x = BTN_REGION_X + (BTN_REGION_W - BTN_FB_W) / 2;
+        rt_uint16_t y = BTN_REGION_Y + (BTN_REGION_H - BTN_FB_H) / 2;
+
+        img_info = btn_left_num[0];
+        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_ebook_leftbtn_touch_callback, (void *)olpc_data, 0);
+        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_ebook_leftbtn_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = btn_left_num[0];
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
 }
 
 /**
  * right button touch.
  */
-static void olpc_ebook_rightbtn_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, void *parameter)
+static rt_err_t olpc_ebook_rightbtn_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
 {
+    rt_err_t ret = RT_ERROR;
     struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
 
-    if (event == TOUCH_EVENT_DOWN)
+    switch (event)
     {
-        if (olpc_data->btn_sta == 1)
+    case TOUCH_EVENT_SHORT_DOWN:
+
+        olpc_data->lbtn_num  = 0;
+        olpc_data->rbtn_num  = 1;
+
+        if (olpc_data->page_num < EBOOK_PAGE_MAX_NUM - 1)
         {
-            olpc_data->lbtn_num  = 0;
-            olpc_data->rbtn_num  = 1;
-
-            if (olpc_data->page_num < EBOOK_PAGE_MAX_NUM - 1)
-            {
-                olpc_data->page_num ++;
-            }
-
-            olpc_data->btndown_timeout = BTN_DOWN_TIME;
-            olpc_data->cmd |= UPDATE_PAGE | UPDATE_BTN;
-            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+            olpc_data->page_num ++;
         }
-        olpc_data->btnon_timeout = BTN_HOLD_TIME;   //reset timer
+
+        olpc_data->btndown_timeout = BTN_DOWN_TIME;
+        olpc_data->cmd |= UPDATE_PAGE | UPDATE_BTN;
+        rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+
+        ret = RT_EOK;
+        break;
+
+    default:
+        break;
     }
+
+    return ret;
+}
+
+static rt_err_t olpc_ebook_rightbtn_touch_register(void *parameter)
+{
+    image_info_t *img_info;
+    struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* right buttons touch register */
+    {
+        rt_uint16_t x = BTN_REGION_X + (BTN_REGION_W - BTN_FB_W) / 2;
+        rt_uint16_t y = BTN_REGION_Y + (BTN_REGION_H - BTN_FB_H) / 2;
+
+        img_info = btn_right_num[0];
+        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_ebook_rightbtn_touch_callback, (void *)olpc_data, 0);
+        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_ebook_rightbtn_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = btn_right_num[0];
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
 }
 
 /**
@@ -474,35 +598,7 @@ static void olpc_ebook_rightbtn_touch_callback(rt_int32_t touch_id, enum olpc_to
  */
 static void olpc_ebook_touch_initial(void *parameter)
 {
-    rt_err_t     ret;
-    image_info_t *img_info;
-    struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
-    struct rt_device_graphic_info info;
-
-    ret = rt_device_control(olpc_data->disp->device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
-
-    /* screen on button touch register */
-    {
-        screen_item.w = WIN_LAYERS_W;
-        screen_item.h = WIN_LAYERS_H;
-        register_touch_item((struct olpc_touch_item *)(&screen_item.touch_item), (void *)olpc_ebook_screen_touch_callback, (void *)olpc_data, 0);
-        update_item_coord((struct olpc_touch_item *)(&screen_item.touch_item), 0, 0, 0, 0);
-    }
-
-    /* left & right buttons touch register */
-    {
-        rt_uint16_t x = BTN_REGION_X + (BTN_REGION_W - BTN_FB_W) / 2;
-        rt_uint16_t y = BTN_REGION_Y + (BTN_REGION_H - BTN_FB_H) / 2;
-
-        img_info = btn_left_num[olpc_data->lbtn_num];
-        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_ebook_leftbtn_touch_callback, (void *)olpc_data, 0);
-        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
-
-        img_info = btn_right_num[olpc_data->rbtn_num];
-        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_ebook_rightbtn_touch_callback, (void *)olpc_data, 0);
-        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
-    }
+    olpc_ebook_screen_touch_register(parameter);
 }
 #endif
 
