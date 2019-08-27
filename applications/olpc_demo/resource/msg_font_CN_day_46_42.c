@@ -1,5 +1,5 @@
 #include <rtthread.h>
-#if defined(OLPC_CLOCK_ENABLE)
+#if defined(OLPC_APP_CLOCK_ENABLE)
 #include "image_info.h"
 
 static unsigned char msg_font_CN_day_46_42[1932UL] =

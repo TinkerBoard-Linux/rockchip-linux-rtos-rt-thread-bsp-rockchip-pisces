@@ -220,6 +220,7 @@
 #define RT_UNCACHE_HEAP_ORDER 0x0E
 #define RT_USING_LARGE_HEAP
 #define RT_LARGE_MALLOC_THRRESH 512
+/* RT_USING_DTCM_HEAP is not set */
 /* RT_USING_PANEL_GC9306_CTC28 is not set */
 /* RT_USING_PANEL_FPGA_LVDS is not set */
 /* RT_USING_PANEL_SS is not set */
@@ -292,11 +293,10 @@
 
 /* Pisces application */
 
-#define RT_USING_OLPC_DEMO
-#define OLPC_CLOCK_ENABLE
-/* OLPC_EBOOK_ENABLE is not set */
+/* RT_USING_OLPC_DEMO is not set */
 
 /* RT-Thread application */
 
+/* RT_USING_CLOCK_DEMO is not set */
 
 #endif

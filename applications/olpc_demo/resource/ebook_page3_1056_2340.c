@@ -1,5 +1,5 @@
 #include <rtthread.h>
-#if defined(OLPC_EBOOK_ENABLE)
+#if defined(OLPC_APP_EBOOK_ENABLE)
 #include "image_info.h"
 
 static unsigned char ebook_page3_1056_2340[25385UL] =

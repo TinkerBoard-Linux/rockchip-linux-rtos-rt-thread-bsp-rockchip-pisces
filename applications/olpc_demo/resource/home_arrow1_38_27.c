@@ -1,5 +1,5 @@
 #include <rtthread.h>
-#if defined(OLPC_CLOCK_ENABLE)
+#if defined(OLPC_APP_CLOCK_ENABLE)
 #include "image_info.h"
 
 static unsigned char home_arrow1_38_27[135UL] =
