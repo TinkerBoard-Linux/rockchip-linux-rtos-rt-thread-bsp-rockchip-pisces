@@ -35,6 +35,9 @@
 #ifdef RT_USING_AUDIO
 #include "rk_audio.h"
 #endif
+#ifdef RT_USING_PM
+#include "drv_pm.h"
+#endif
 
 #ifdef RT_USING_CRU
 static const struct clk_dump clk_inits[] =
@@ -252,6 +255,84 @@ static struct regulator_desc regulators[] =
         },
     },
 };
+
+const struct regulator_init regulator_inits[] =
+{
+    REGULATOR_INIT("vdd_dsp_core", PWR_ID_DSP_CORE, 800000, 800000, 1),
+    { /* sentinel */ },
+};
+#endif
+
+#ifdef RT_USING_PM_REQ_PWR
+static uint32_t core_pwr_req[2];
+static struct req_pwr_desc req_pwr_array[] =
+{
+    {
+        .pwr_id = PWR_ID_CORE,
+        .req_ctrl = {
+            .info.ttl_req = HAL_ARRAY_SIZE(core_pwr_req), /* for core & shrm */
+            .req_vals = &core_pwr_req[0],
+        }
+    }
+};
+#endif
+
+#ifdef RT_USING_PM_DVFS
+const static struct dvfs_table dvfs_core_table[] =
+{
+    {
+        .freq = 297000000,
+        .volt = 800000,
+    },
+    {
+        .freq = 396000000,
+        .volt = 900000,
+    },
+};
+
+const static struct dvfs_table dvfs_shrm_table[] =
+{
+    {
+        .freq = 297000000,
+        .volt = 800000,
+    },
+    {
+        .freq = 396000000,
+        .volt = 850000,
+    },
+};
+
+struct rk_dvfs_desc dvfs_data[] =
+{
+    {
+        .clk_id = SCLK_SHRM,
+        .pwr_id = PWR_ID_CORE,
+        .tbl_idx = 0,
+        .table = &dvfs_shrm_table[0],
+        .tbl_cnt = HAL_ARRAY_SIZE(dvfs_shrm_table),
+    },
+    {
+        .clk_id = HCLK_M4,
+        .pwr_id = PWR_ID_CORE,
+        .tbl_idx = 0,
+        .table = &dvfs_core_table[0],
+        .tbl_cnt = HAL_ARRAY_SIZE(dvfs_core_table),
+    },
+};
+
+static struct pm_mode_dvfs pm_mode_data[] =
+{
+    {
+        .clk_id = HCLK_M4,
+        .run_tbl_idx = { 1, 0, 0 },
+        .sleep_tbl_idx = 0,
+    },
+    {
+        .clk_id = SCLK_SHRM,
+        .run_tbl_idx = { 1, 0, 0 },
+        .sleep_tbl_idx = 0,
+    },
+};
 #endif
 
 /**
@@ -299,8 +380,17 @@ void rt_hw_board_init()
     print_clk_summary_info();
 #endif
 
-#if 0//def HAL_PWR_MODULE_ENABLED
+#ifdef HAL_PWR_MODULE_ENABLED
     regulator_desc_init(regulators, HAL_ARRAY_SIZE(regulators));
+#endif
+
+#ifdef RT_USING_PM_REQ_PWR
+    regulator_req_desc_init(req_pwr_array, HAL_ARRAY_SIZE(req_pwr_array));
+#endif
+
+#ifdef RT_USING_PM_DVFS
+    dvfs_desc_init(dvfs_data, HAL_ARRAY_SIZE(dvfs_data));
+    rkpm_register_dvfs_info(pm_mode_data, HAL_ARRAY_SIZE(pm_mode_data), 0);
 #endif
 
     /* hal bsp init */
