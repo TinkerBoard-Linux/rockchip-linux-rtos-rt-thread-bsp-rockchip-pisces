@@ -47,6 +47,7 @@ struct olpc_touch
     rt_tick_t               tick;
 };
 
+void olpc_touch_reset(void);
 rt_err_t register_touch_item(struct olpc_touch_item *item,
                              void (*entry)(void *parameter),
                              void *parameter,
