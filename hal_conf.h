@@ -14,11 +14,6 @@
 
 #define SYS_TIMER TIMER5 /* System timer designation (RK TIMER) */
 
-/* DEG LEVEL */
-#define HAL_DBG_ON 1                 /* the master switch for hal debug log, comment out it will disable all of hal log */
-#define HAL_DBG_INFO_ON 1            /* enable hal log with info level */
-#define HAL_DBG_WRN_ON 1             /* enable hal log with warning level */
-#define HAL_DBG_ERR_ON 1             /* enable hal log with error level */
 #define HAL_DBG_USING_RTT_SERIAL 1   /* redirect the hal log to rtt console */
 
 #ifdef RT_USING_ACDCDIG
