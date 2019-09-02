@@ -105,8 +105,6 @@ static uint32_t bpp1_lut[2] =
  *
  **************************************************************************************************
  */
-static image_info_t screen_item;
-
 extern image_info_t lock_bar_info;
 extern image_info_t lock_block_info;
 
@@ -150,6 +148,7 @@ extern image_info_t fingerprint1_info;
 extern image_info_t fingerprint2_info;
 extern image_info_t fingerprint3_info;
 
+#if defined(RT_USING_TOUCH)
 static rt_err_t olpc_clock_screen_touch_register(void *parameter);
 static rt_err_t olpc_clock_screen_touch_unregister(void *parameter);
 static rt_err_t olpc_clock_home_touch_register(void *parameter);
@@ -158,6 +157,8 @@ static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter);
 static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter);
 static rt_err_t olpc_clock_lock_touch_register(void *parameter);
 static rt_err_t olpc_clock_lock_touch_unregister(void *parameter);
+static image_info_t screen_item;
+#endif
 
 /*
  **************************************************************************************************
@@ -1130,10 +1131,12 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
 
             rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
+#if defined(RT_USING_TOUCH)
             olpc_clock_lock_touch_unregister(olpc_data);
 
             olpc_clock_home_touch_register(olpc_data);
             olpc_clock_fingerprint_touch_register(olpc_data);
+#endif
 
             olpc_data->home_id  = 8;
             olpc_data->fp_id    = 0;
@@ -1499,14 +1502,6 @@ static rt_err_t olpc_clock_lock_touch_unregister(void *parameter)
 
     return RT_EOK;
 }
-
-/**
- * touch items regester & init.
- */
-void olpc_clock_touch_initial(void *parameter)
-{
-    olpc_clock_screen_touch_register(parameter);
-}
 #endif
 
 /*
@@ -1554,7 +1549,7 @@ static void olpc_clock_thread(void *p)
     ret = rt_device_open(olpc_data->touch_dev, RT_DEVICE_FLAG_RDWR);
     RT_ASSERT(ret == RT_EOK);
 
-    olpc_clock_touch_initial(olpc_data);
+    olpc_clock_screen_touch_register(olpc_data);
 #endif
 
     olpc_data->disp_event = rt_event_create("display_event", RT_IPC_FLAG_FIFO);
@@ -1583,7 +1578,10 @@ static void olpc_clock_thread(void *p)
     }
 
     /* Thread deinit */
+#if defined(RT_USING_TOUCH)
+    olpc_clock_screen_touch_unregister(olpc_data);
     rt_device_close(olpc_data->touch_dev);
+#endif
 
     olpc_clock_deinit(olpc_data);
 

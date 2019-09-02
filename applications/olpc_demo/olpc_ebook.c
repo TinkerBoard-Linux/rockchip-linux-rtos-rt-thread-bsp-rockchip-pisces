@@ -63,8 +63,6 @@ static uint32_t bpp1_lut[2] =
  *
  **************************************************************************************************
  */
-static image_info_t screen_item;
-
 extern image_info_t ebook_page1_info;
 extern image_info_t ebook_page2_info;
 extern image_info_t ebook_page3_info;
@@ -76,10 +74,13 @@ extern image_info_t ebook_btn_rightdown_info;
 extern image_info_t ebook_btn_leftup_info;
 extern image_info_t ebook_btn_leftdown_info;
 
+#if defined(RT_USING_TOUCH)
 static rt_err_t olpc_ebook_leftbtn_touch_register(void *parameter);
 static rt_err_t olpc_ebook_leftbtn_touch_unregister(void *parameter);
 static rt_err_t olpc_ebook_rightbtn_touch_register(void *parameter);
 static rt_err_t olpc_ebook_rightbtn_touch_unregister(void *parameter);
+static image_info_t screen_item;
+#endif
 
 /*
  **************************************************************************************************
@@ -593,13 +594,6 @@ static rt_err_t olpc_ebook_rightbtn_touch_unregister(void *parameter)
     return RT_EOK;
 }
 
-/**
- * touch items regester & init.
- */
-static void olpc_ebook_touch_initial(void *parameter)
-{
-    olpc_ebook_screen_touch_register(parameter);
-}
 #endif
 
 /*
@@ -647,7 +641,7 @@ static void olpc_ebook_thread(void *p)
     ret = rt_device_open(olpc_data->touch_dev, RT_DEVICE_FLAG_RDWR);
     RT_ASSERT(ret == RT_EOK);
 
-    olpc_ebook_touch_initial(olpc_data);
+    olpc_ebook_screen_touch_register(olpc_data);
 #endif
 
     olpc_data->disp_event = rt_event_create("display_event", RT_IPC_FLAG_FIFO);
@@ -676,7 +670,10 @@ static void olpc_ebook_thread(void *p)
     }
 
     /* Thread deinit */
+#if defined(RT_USING_TOUCH)
+    olpc_ebook_screen_touch_unregister(olpc_data);
     rt_device_close(olpc_data->touch_dev);
+#endif
 
     olpc_ebook_deinit(olpc_data);
 
