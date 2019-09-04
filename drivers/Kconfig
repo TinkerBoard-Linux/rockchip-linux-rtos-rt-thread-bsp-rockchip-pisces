@@ -134,6 +134,19 @@ menu "Enable Audio"
         bool "Enable VAD"
         default n
 
+    choice
+        prompt "VAD irq handler"
+        depends on RT_USING_VAD
+        default RT_VAD_IRQ_HANDLED_BY_DSP
+
+        config RT_VAD_IRQ_HANDLED_BY_DSP
+            bool "handled by DSP"
+
+        config RT_VAD_IRQ_HANDLED_BY_CPU
+            bool "handled by CPU"
+
+    endchoice
+
     config RT_USING_AUDIO_CARD_MIC
         bool "Select mics audio card"
         default n
