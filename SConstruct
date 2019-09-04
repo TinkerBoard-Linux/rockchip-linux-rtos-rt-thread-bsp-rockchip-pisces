@@ -16,6 +16,7 @@ env = Environment(tools = ['mingw'],
 	AS = rtconfig.AS, ASFLAGS = rtconfig.AFLAGS,
 	CC = rtconfig.CC, CCFLAGS = rtconfig.CFLAGS,
 	AR = rtconfig.AR, ARFLAGS = '-rc',
+	CPPFLAGS = '-D__RT_THREAD__',
 	LINK = rtconfig.LINK, LINKFLAGS = rtconfig.LFLAGS)
 env.PrependENVPath('PATH', rtconfig.EXEC_PATH)
 
