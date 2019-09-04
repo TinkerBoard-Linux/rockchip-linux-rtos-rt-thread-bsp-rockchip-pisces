@@ -16,14 +16,10 @@ config RT_USING_DMA
     bool "Enable General DMA Framework"
     default n
 
-choice
-    prompt "DMA Type"
+config RT_USING_DMA_PL330
+    bool "Enable PL330 DMA Controller"
     depends on RT_USING_DMA
-
-    config RT_USING_DMA_PL330
-        bool "Enable PL330 DMA Controller"
-        default n
-endchoice
+    default n
 
 config RT_USING_PMU
     bool "Enable PMU"
@@ -137,6 +133,29 @@ menu "Enable Audio"
     config RT_USING_VAD
         bool "Enable VAD"
         default n
+
+    config RT_USING_AUDIO_CARD_MIC
+        bool "Select mics audio card"
+        default n
+
+    choice
+        prompt "mics type"
+        depends on RT_USING_AUDIO_CARD_MIC
+
+        config RT_USING_AUDIO_CARD_ANALOG_MIC
+            select RT_USING_I2STDM
+            select RT_USING_ACDCDIG
+            bool "Enable internal analog mics audio card"
+
+        config RT_USING_AUDIO_CARD_I2S_MIC
+            select RT_USING_I2STDM
+            bool "Enable i2s digital mics audio card"
+
+        config RT_USING_AUDIO_CARD_PDM_MIC
+            select RT_USING_PDM
+            bool "Enable pdm digital mics audio card"
+
+    endchoice
 endmenu
 endif
 

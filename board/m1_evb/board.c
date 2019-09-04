@@ -83,6 +83,7 @@ static const struct clk_unused clks_unused[] =
 #ifdef RT_USING_AUDIO
 const struct audio_card_desc rk_board_audio_cards[] =
 {
+#ifdef RT_USING_AUDIO_CARD_ACDCDIG
     {
         .name = "sound0",
         .dai = I2STDM0,
@@ -92,6 +93,28 @@ const struct audio_card_desc rk_board_audio_cards[] =
         .mclkfs = 2048,
         .format = AUDIO_FMT_I2S,
     },
+#endif
+#ifdef RT_USING_AUDIO_CARD_I2S_MIC
+    {
+        .name = "sound0",
+        .dai = I2STDM0,
+        .vad = VAD,
+        .codec = NULL,
+        .capture = true,
+        .mclkfs = 256,
+        .format = AUDIO_FMT_I2S,
+    },
+#endif
+#ifdef RT_USING_AUDIO_CARD_PDM_MIC
+    {
+        .name = "sound0",
+        .dai = PDM0,
+        .vad = VAD,
+        .codec = NULL,
+        .capture = true,
+        .format = AUDIO_FMT_PDM,
+    },
+#endif
     { /* sentinel */ }
 };
 #endif
