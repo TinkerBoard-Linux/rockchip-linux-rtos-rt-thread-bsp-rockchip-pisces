@@ -5,8 +5,8 @@ from building import *
 cwd     = GetCurrentDir()
 src  = Glob('*.c')
 src += Glob('resource/*.c')
-CPPPATH = [cwd]
+LOCAL_CPPPATH = [cwd]
 
-group = DefineGroup('Applications', src, depend = ['RT_USING_OLPC_DEMO'], CPPPATH = CPPPATH)
+group = DefineGroup('Applications', src, depend = ['RT_USING_OLPC_DEMO'], LOCAL_CPPPATH = LOCAL_CPPPATH)
 
 Return('group')

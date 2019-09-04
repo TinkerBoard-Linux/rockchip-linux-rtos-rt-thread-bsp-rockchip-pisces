@@ -19,8 +19,8 @@
 #include <rtthread.h>
 
 #ifdef RT_USING_TOUCH
-#include <drv_touch.h>
-#include <olpc_touch.h>
+#include "drv_touch.h"
+#include "olpc_touch.h"
 #endif
 
 /**

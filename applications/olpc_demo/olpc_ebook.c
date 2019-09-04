@@ -69,16 +69,17 @@ extern image_info_t ebook_page3_info;
 extern image_info_t ebook_page4_info;
 extern image_info_t ebook_page5_info;
 
+#if defined(RT_USING_TOUCH)
+#if defined(OLPC_APP_EBOOK_USE_BTN)
 extern image_info_t ebook_btn_rightup_info;
 extern image_info_t ebook_btn_rightdown_info;
 extern image_info_t ebook_btn_leftup_info;
 extern image_info_t ebook_btn_leftdown_info;
-
-#if defined(RT_USING_TOUCH)
 static rt_err_t olpc_ebook_leftbtn_touch_register(void *parameter);
 static rt_err_t olpc_ebook_leftbtn_touch_unregister(void *parameter);
 static rt_err_t olpc_ebook_rightbtn_touch_register(void *parameter);
 static rt_err_t olpc_ebook_rightbtn_touch_unregister(void *parameter);
+#endif
 static image_info_t screen_item;
 #endif
 
@@ -127,6 +128,7 @@ static image_info_t *ebook_pages_num[EBOOK_PAGE_MAX_NUM] =
     &ebook_page5_info,
 };
 
+#if defined(OLPC_APP_EBOOK_USE_BTN)
 static image_info_t *btn_right_num[2] =
 {
     &ebook_btn_rightup_info,
@@ -138,6 +140,7 @@ static image_info_t *btn_left_num[2] =
     &ebook_btn_leftup_info,
     &ebook_btn_leftdown_info,
 };
+#endif
 
 /*
  **************************************************************************************************
@@ -159,7 +162,7 @@ static void olpc_ebook_timeout(void *parameter)
         olpc_data->ticks = (olpc_data->ticks / EBOOK_TIMER_PERIOD) * EBOOK_TIMER_PERIOD;
     }
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_TOUCH) && defined(OLPC_APP_EBOOK_USE_BTN)
     // btn display on
     if (olpc_data->btn_sta == 1)
     {
@@ -283,7 +286,7 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
     struct rt_device_graphic_info info;
-    struct rt_display_config btnwin, pagewin, *wlist_head = RT_NULL;
+    struct rt_display_config pagewin, *wlist_head = RT_NULL;
 
     //rt_tick_t ticks = rt_tick_get();
 
@@ -332,6 +335,8 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
         rt_display_img_fill(img_info, pagewin.fb, pagewin.w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
+#if defined(RT_USING_TOUCH) && defined(OLPC_APP_EBOOK_USE_BTN)
+    struct rt_display_config btnwin;
     if ((olpc_data->cmd & UPDATE_BTN) == UPDATE_BTN)
     {
         olpc_data->cmd &= ~UPDATE_BTN;
@@ -375,6 +380,7 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
             rt_display_img_fill(img_info, btnwin.fb, btnwin.w, xoffset + img_info->x, yoffset + img_info->y);
         }
     }
+#endif
 
     ret = rt_display_win_layers_set(wlist_head);
     RT_ASSERT(ret == RT_EOK);
@@ -405,6 +411,11 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
 /**
  * screen touch.
  */
+#ifndef OLPC_APP_EBOOK_USE_BTN
+#define PAGE_MOVE_XSTEP_MIN (80)
+static struct point_info down_point;
+static struct point_info up_point;
+#endif
 static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
 {
     rt_err_t ret = RT_ERROR;
@@ -413,6 +424,7 @@ static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_
     switch (event)
     {
     case TOUCH_EVENT_SHORT_DOWN:
+#ifdef OLPC_APP_EBOOK_USE_BTN
         if (olpc_data->btn_sta == 0)
         {
             olpc_data->btn_sta = 1;
@@ -427,7 +439,48 @@ static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_
 
             ret = RT_EOK;
         }
+#else
+        down_point.x = point->x;
+        down_point.y = point->y;
+        ret = RT_EOK;
+#endif
         break;
+
+    case TOUCH_EVENT_MOVE:
+#ifndef OLPC_APP_EBOOK_USE_BTN
+        up_point.x = point->x;
+        up_point.y = point->y;
+        ret = RT_EOK;
+#endif
+        break;
+
+    case TOUCH_EVENT_UP:
+#ifndef OLPC_APP_EBOOK_USE_BTN
+    {
+        rt_int16_t diff = up_point.x - down_point.x;
+        if (diff < -PAGE_MOVE_XSTEP_MIN)
+        {
+            if (olpc_data->page_num < EBOOK_PAGE_MAX_NUM - 1)
+            {
+                olpc_data->page_num ++;
+            }
+            olpc_data->cmd |= UPDATE_PAGE;
+            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+            ret = RT_EOK;
+        }
+        else if (diff > PAGE_MOVE_XSTEP_MIN)
+        {
+            if (olpc_data->page_num > 0)
+            {
+                olpc_data->page_num --;
+            }
+            olpc_data->cmd |= UPDATE_PAGE;
+            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+            ret = RT_EOK;
+        }
+    }
+#endif
+    break;
 
     default:
         break;
@@ -466,6 +519,7 @@ static rt_err_t olpc_ebook_screen_touch_unregister(void *parameter)
     return RT_EOK;
 }
 
+#ifdef OLPC_APP_EBOOK_USE_BTN
 /**
  * left button touch.
  */
@@ -593,6 +647,7 @@ static rt_err_t olpc_ebook_rightbtn_touch_unregister(void *parameter)
 
     return RT_EOK;
 }
+#endif
 
 #endif
 
