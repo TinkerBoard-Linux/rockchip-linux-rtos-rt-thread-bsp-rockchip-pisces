@@ -15,7 +15,8 @@
  */
 static uint32_t bpp1_lut[2] =
 {
-    0x000000, 0x005E5E5E
+    //0x000000, 0x005E5E5E
+    0x000000, 0x00FFFFFF
 };
 
 /*
@@ -412,9 +413,11 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
  * screen touch.
  */
 #ifndef OLPC_APP_EBOOK_USE_BTN
-#define PAGE_MOVE_XSTEP_MIN (80)
+#define BL_MOVE_STEP_MIN    (100)
+#define PAGE_MOVE_STEP_MIN  (440)
 static struct point_info down_point;
 static struct point_info up_point;
+static uint8_t page_bl_flag = 0;
 #endif
 static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
 {
@@ -440,43 +443,112 @@ static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_
             ret = RT_EOK;
         }
 #else
+        page_bl_flag = 0;
         down_point.x = point->x;
         down_point.y = point->y;
+
         ret = RT_EOK;
 #endif
         break;
 
     case TOUCH_EVENT_MOVE:
 #ifndef OLPC_APP_EBOOK_USE_BTN
-        up_point.x = point->x;
-        up_point.y = point->y;
-        ret = RT_EOK;
+        //check page move or bl move
+        if (page_bl_flag == 0)
+        {
+            rt_int16_t xdiff = point->x - down_point.x;
+            rt_int16_t ydiff = point->y - down_point.y;
+
+            if (ABS(xdiff) >= PAGE_MOVE_STEP_MIN)
+            {
+                //rt_kprintf("page move!!!!\n");
+                page_bl_flag = 1;
+            }
+            else if ((ABS(ydiff) >= BL_MOVE_STEP_MIN) && (ABS(xdiff) < BL_MOVE_STEP_MIN))
+            {
+                //rt_kprintf("bl move!!!!\n");
+                page_bl_flag = 2;
+            }
+        }
+
+        // page move
+        if (page_bl_flag == 1)
+        {
+            up_point.x = point->x;
+            up_point.y = point->y;
+        }
+        // backlight move
+        else if (page_bl_flag == 2)
+        {
+            rt_int32_t xdiff = point->x - down_point.x;
+            rt_int32_t ydiff = -(point->y - down_point.y);
+
+            // if x out of range reset touch
+            if (ABS(xdiff) > BL_MOVE_STEP_MIN)
+            {
+                rt_kprintf("touch reset\n");
+                olpc_touch_reset();
+            }
+
+            if (ABS(ydiff) > BL_MOVE_STEP_MIN)
+            {
+                down_point.y = point->y;
+
+                struct rt_device_graphic_info info;
+                rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+                olpc_data->disp->blval += ydiff * rt_display_get_bl_max(olpc_data->disp->device) / WIN_LAYERS_H * 2;
+                if ((rt_int16_t)olpc_data->disp->blval < 0)
+                {
+                    olpc_data->disp->blval = 0;
+                }
+                else if ((rt_int16_t)olpc_data->disp->blval > rt_display_get_bl_max(olpc_data->disp->device))
+                {
+                    olpc_data->disp->blval = rt_display_get_bl_max(olpc_data->disp->device);
+                }
+                //rt_kprintf("backlight val = %d\n", olpc_data->disp->blval);
+
+                ret = rt_device_control(olpc_data->disp->device, RTGRAPHIC_CTRL_POWERON, NULL);
+                RT_ASSERT(ret == RT_EOK);
+
+                ret = rt_device_control(olpc_data->disp->device, RK_DISPLAY_CTRL_UPDATE_BL, &olpc_data->disp->blval);
+                RT_ASSERT(ret == RT_EOK);
+
+                ret = rt_device_control(olpc_data->disp->device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+                RT_ASSERT(ret == RT_EOK);
+            }
+
+            ret = RT_EOK;
+        }
 #endif
         break;
 
     case TOUCH_EVENT_UP:
 #ifndef OLPC_APP_EBOOK_USE_BTN
     {
-        rt_int16_t diff = up_point.x - down_point.x;
-        if (diff < -PAGE_MOVE_XSTEP_MIN)
+        if (page_bl_flag == 1)
         {
-            if (olpc_data->page_num < EBOOK_PAGE_MAX_NUM - 1)
+            rt_int16_t diff = up_point.x - down_point.x;
+            if (diff < -PAGE_MOVE_STEP_MIN)
             {
-                olpc_data->page_num ++;
+                if (olpc_data->page_num < EBOOK_PAGE_MAX_NUM - 1)
+                {
+                    olpc_data->page_num ++;
+                }
+                olpc_data->cmd |= UPDATE_PAGE;
+                rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+                ret = RT_EOK;
             }
-            olpc_data->cmd |= UPDATE_PAGE;
-            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
-            ret = RT_EOK;
-        }
-        else if (diff > PAGE_MOVE_XSTEP_MIN)
-        {
-            if (olpc_data->page_num > 0)
+            else if (diff > PAGE_MOVE_STEP_MIN)
             {
-                olpc_data->page_num --;
+                if (olpc_data->page_num > 0)
+                {
+                    olpc_data->page_num --;
+                }
+                olpc_data->cmd |= UPDATE_PAGE;
+                rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
+                ret = RT_EOK;
             }
-            olpc_data->cmd |= UPDATE_PAGE;
-            rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
-            ret = RT_EOK;
         }
     }
 #endif

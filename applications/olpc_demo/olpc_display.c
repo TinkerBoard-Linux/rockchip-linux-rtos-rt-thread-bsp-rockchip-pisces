@@ -717,6 +717,16 @@ rt_err_t rt_display_sync_hook(rt_device_t device)
 }
 
 /**
+ * Get MAX value of backlight.
+ */
+rt_uint16_t rt_display_get_bl_max(rt_device_t device)
+{
+    struct display_state *state = (struct display_state *)device->user_data;
+
+    return state->panel_state.max_brightness;
+}
+
+/**
  * Display application initial, initial screen and win layers.
  */
 rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
@@ -785,6 +795,10 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
         disp_data->lut[lutC->winId].lut    = lutC->lut;
         disp_data->lut[lutC->winId].format = lutC->format;
     }
+
+    disp_data->blval = rt_display_get_bl_max(device) / 2;
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_UPDATE_BL, &disp_data->blval);
+    RT_ASSERT(ret == RT_EOK);
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_COMMIT, NULL);
     RT_ASSERT(ret == RT_EOK);

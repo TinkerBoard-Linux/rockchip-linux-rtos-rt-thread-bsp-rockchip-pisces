@@ -121,7 +121,7 @@ rt_uint8_t is_tp_in_item(struct point_info *point, image_info_t *item)
 
 void olpc_touch_reset(void)
 {
-    g_olpc_touch.state = TOUCH_EVENT_UP;
+    g_olpc_touch.state = TOUCH_EVENT_NULL;
 }
 
 rt_err_t iterate_touch_item_list(struct olpc_touch_item *header, struct point_info *point)

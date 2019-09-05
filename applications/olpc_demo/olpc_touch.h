@@ -29,7 +29,8 @@ struct olpc_touch_item
  */
 enum olpc_touch_event
 {
-    TOUCH_EVENT_UP = 0,
+    TOUCH_EVENT_NULL = 0,
+    TOUCH_EVENT_UP,
     TOUCH_EVENT_PROB,
     TOUCH_EVENT_SHORT_DOWN,
     TOUCH_EVENT_LONG_DOWN,

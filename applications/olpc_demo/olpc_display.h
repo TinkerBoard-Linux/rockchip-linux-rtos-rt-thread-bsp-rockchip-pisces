@@ -18,6 +18,7 @@
 #define __OLPC_DISPLAY_H__
 #include <rtthread.h>
 #include "color_palette.h"
+#include "drv_display.h"
 
 /* Macro define */
 #define MIN(X, Y)           ((X)<(Y)?(X):(Y))
@@ -76,6 +77,8 @@ struct rt_display_data
 
     rt_uint16_t xres;
     rt_uint16_t yres;
+
+    rt_uint16_t  blval;
 };
 typedef struct rt_display_data *rt_display_data_t;
 
@@ -145,5 +148,11 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lut0,
  * Display application deinitial, free resources.
  */
 void rt_display_deinit(rt_display_data_t disp_data);
+
+
+/**
+ * Get MAX value of backlight.
+ */
+rt_uint16_t rt_display_get_bl_max(rt_device_t device);
 
 #endif
