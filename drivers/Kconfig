@@ -126,8 +126,18 @@ menu "Enable Audio"
         bool "Enable I2STDM"
         default n
 
+    config RT_USING_I2STDM0
+        bool "Enable I2STDM0"
+        depends on RT_USING_I2STDM
+        default n
+
     config RT_USING_PDM
         bool "Enable PDM"
+        default n
+
+    config RT_USING_PDM0
+        bool "Enable PDM0"
+        depends on RT_USING_PDM
         default n
 
     config RT_USING_VAD
