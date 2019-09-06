@@ -118,10 +118,6 @@ menu "Enable Audio"
         select RT_USING_DMA
         default y
 
-    config RT_USING_ACDCDIG
-        bool "Enable ACDCDIG"
-        default n
-
     config RT_USING_I2STDM
         bool "Enable I2STDM"
         default n
