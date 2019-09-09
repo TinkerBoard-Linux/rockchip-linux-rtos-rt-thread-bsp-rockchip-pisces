@@ -251,8 +251,8 @@ static void wakeup_iomux_config(void)
                          PIN_CONFIG_MUX_FUNC1);
 
     HAL_PINCTRL_SetIOMUX(GPIO_BANK1,
-                         GPIO_PIN_B1,   // AP_WAKEUP_OLPC
-                         PIN_CONFIG_MUX_FUNC1);
+                         GPIO_PIN_B1,
+                         PIN_CONFIG_MUX_FUNC0); //AP WAKEUP M1 by gpio interrupt
 }
 
 /**
