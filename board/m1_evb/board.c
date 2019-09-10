@@ -365,11 +365,13 @@ void rt_hw_board_init()
 {
     mpu_init();
 
-    /* Register Systick handler */
-    rt_hw_interrupt_install(SysTick_IRQn, systick_isr, RT_NULL, "tick");
-
     /* HAL_Init */
     HAL_Init();
+
+    /* System tick init */
+    rt_hw_interrupt_install(SysTick_IRQn, systick_isr, RT_NULL, "tick");
+    HAL_SetTickFreq(1000 / RT_TICK_PER_SECOND);
+    HAL_SYSTICK_Init();
 
     rt_hw_cpu_cache_init();
 
