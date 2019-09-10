@@ -18,7 +18,7 @@
 #include "drv_uart.h"
 #include "drv_cache.h"
 #include "hal_base.h"
-#include "bsp.h"
+#include "hal_bsp.h"
 
 static const struct clk_dump clk_inits[] =
 {

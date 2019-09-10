@@ -15,7 +15,7 @@
 #include "board.h"
 #include "drv_cache.h"
 #include "hal_base.h"
-#include "bsp.h"
+#include "hal_bsp.h"
 
 #ifdef RT_USING_CRU
 #include "drv_clock.h"
