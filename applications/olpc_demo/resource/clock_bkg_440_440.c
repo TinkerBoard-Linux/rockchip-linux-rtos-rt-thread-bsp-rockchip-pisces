@@ -1,5 +1,5 @@
 #include <rtthread.h>
-#if defined(OLPC_APP_CLOCK_ENABLE) || defined(OLPC_LVGL_CLOCK_ENABLE)
+#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC)
 #include "image_info.h"
 
 static unsigned char clock_bkg_440_440[6145UL] =

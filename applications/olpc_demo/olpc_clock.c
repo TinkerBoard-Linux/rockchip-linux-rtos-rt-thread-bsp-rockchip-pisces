@@ -112,6 +112,9 @@ extern image_info_t clock_bkg_info;
 extern image_info_t clock_sec_info;
 extern image_info_t clock_min_info;
 extern image_info_t clock_hour_info;
+#ifdef OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
+extern image_info_t clock_centre_info;
+#endif
 
 extern image_info_t msg_font_0_info;
 extern image_info_t msg_font_1_info;
@@ -641,9 +644,13 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
         {
             angle += 360;
         }
+#ifdef OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
+        rt_display_rotate((float)angle, img_info->w, img_info->h, img_info->data,
+                          (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset), background_w, 4, img_info->h / 2);
+#else
         rt_display_rotate((float)angle, img_info->w, img_info->h, img_info->data,
                           (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset), background_w, 16, img_info->h / 2);
-
+#endif
         //draw min line
         img_info = &clock_min_info;
         RT_ASSERT(img_info->w <= wincfg.w / 2);
@@ -655,9 +662,13 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
         {
             angle += 360;
         }
+#ifdef OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
+        rt_display_rotate((float)angle, img_info->w, img_info->h, img_info->data,
+                          (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset), background_w, 4, img_info->h / 2);
+#else
         rt_display_rotate((float)angle, img_info->w, img_info->h, img_info->data,
                           (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset), background_w, 18, img_info->h / 2);
-
+#endif
         //draw second line
         img_info = &clock_sec_info;
         RT_ASSERT(img_info->w <= wincfg.w / 2);
@@ -669,8 +680,24 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
         {
             angle += 360;
         }
+#ifdef OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
+        rt_display_rotate((float)angle, img_info->w, img_info->h, img_info->data,
+                          (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset), background_w, 4, img_info->h / 2);
+#else
         rt_display_rotate((float)angle, img_info->w, img_info->h, img_info->data,
                           (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset), background_w, 20, img_info->h / 2);
+#endif
+
+#ifdef OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
+        //draw background
+        img_info = &clock_centre_info;
+        RT_ASSERT(img_info->w <= wincfg.w);
+        RT_ASSERT(img_info->h <= wincfg.h);
+
+        yoffset  -= img_info->h / 2;
+        xoffset  -= img_info->w / 2;
+        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+#endif
     }
 
     //refresh screen

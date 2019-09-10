@@ -20,6 +20,19 @@ if RT_USING_OLPC_DEMO
             bool "olpc ebook demo enable"
     endchoice
 
+    if OLPC_APP_CLOCK_ENABLE
+        choice
+            prompt "olpc clock style select"
+            default OLPC_APP_CLOCK_STYLE_ROUND_ARABIC
+
+            config OLPC_APP_CLOCK_STYLE_ROUND_ARABIC
+                bool "select round disc with Arabic number"
+
+            config OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
+                bool "select round disc with Roman number"
+        endchoice
+    endif
+
     if OLPC_APP_EBOOK_ENABLE
         config OLPC_APP_EBOOK_USE_BTN
             bool "olpc ebook use button enable"
