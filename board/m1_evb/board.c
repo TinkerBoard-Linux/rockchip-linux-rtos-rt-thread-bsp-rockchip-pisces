@@ -83,7 +83,7 @@ static const struct clk_unused clks_unused[] =
 #ifdef RT_USING_AUDIO
 const struct audio_card_desc rk_board_audio_cards[] =
 {
-#ifdef RT_USING_AUDIO_CARD_ACDCDIG
+#ifdef RT_USING_AUDIO_CARD_ANALOG_MIC
     {
         .name = "sound0",
         .dai = I2STDM0,

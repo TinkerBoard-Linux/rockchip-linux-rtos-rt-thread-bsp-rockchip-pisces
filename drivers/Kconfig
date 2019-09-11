@@ -155,6 +155,7 @@ menu "Enable Audio"
 
     config RT_USING_AUDIO_CARD_MIC
         bool "Select mics audio card"
+        select RT_USING_CODEC
         default n
 
     choice
@@ -175,6 +176,8 @@ menu "Enable Audio"
             bool "Enable pdm digital mics audio card"
 
     endchoice
+
+    source "$BSP_DIR/../common/drivers/audio/codecs/Kconfig"
 endmenu
 endif
 
