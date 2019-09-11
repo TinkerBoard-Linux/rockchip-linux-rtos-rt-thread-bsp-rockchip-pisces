@@ -14,6 +14,9 @@ if RT_USING_OLPC_DEMO
 
         config OLPC_APP_EBOOK_ENABLE
             bool "olpc ebook demo enable"
+
+        config OLPC_APP_BLOCK_ENABLE
+            bool "olpc block game enable"
     endchoice
 
     if OLPC_APP_CLOCK_ENABLE

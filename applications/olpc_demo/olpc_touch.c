@@ -20,8 +20,8 @@
 
 #include "image_info.h"
 
-#define TOUCH_DOWN_PROB_TIME        ((RT_TICK_PER_SECOND / 1000) * 50)
-#define TOUCH_LONG_DOWN_PROB_TIME   ((RT_TICK_PER_SECOND / 1000) * 2000)
+#define TOUCH_DOWN_PROB_TIME        ((RT_TICK_PER_SECOND / 1000) * 20)
+#define TOUCH_LONG_DOWN_PROB_TIME   ((RT_TICK_PER_SECOND / 1000) * 1000)
 #define TOUCH_LONG_PRESS_STEP_TIME  ((RT_TICK_PER_SECOND / 1000) * 200)
 
 static struct olpc_touch g_olpc_touch =
