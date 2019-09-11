@@ -273,6 +273,9 @@ static void touch_mgr_thread_entry(void *parameter)
     touch_dev = (touch_device_t *)rt_device_find("s3706");
     RT_ASSERT(touch_dev != RT_NULL);
 
+    ret = rt_device_open((rt_device_t)touch_dev, RT_DEVICE_FLAG_RDWR);
+    RT_ASSERT(ret == RT_EOK);
+
     while (1)
     {
         ret = rt_mq_recv(&touch_dev->tp_mq, &point, sizeof(struct point_info), RT_WAITING_FOREVER);
@@ -283,6 +286,8 @@ static void touch_mgr_thread_entry(void *parameter)
         /* iterate touch item list */
         iterate_touch_item_list(touch_list, &point);
     }
+
+    rt_device_close((rt_device_t)touch_dev);
 }
 
 int olpc_touch_init(void)

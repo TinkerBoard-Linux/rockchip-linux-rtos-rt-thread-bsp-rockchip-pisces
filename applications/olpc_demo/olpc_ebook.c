@@ -95,10 +95,6 @@ struct olpc_ebook_data
 {
     rt_display_data_t disp;
 
-#if defined(RT_USING_TOUCH)
-    rt_device_t   touch_dev;
-#endif
-
     rt_uint8_t *fb;
     rt_uint32_t fblen;
     rt_timer_t  ebook_timer;
@@ -762,12 +758,6 @@ static void olpc_ebook_thread(void *p)
     RT_ASSERT(olpc_data->disp != RT_NULL);
 
 #if defined(RT_USING_TOUCH)
-    olpc_data->touch_dev = rt_device_find("s3706");
-    RT_ASSERT(olpc_data->touch_dev != RT_NULL);
-
-    ret = rt_device_open(olpc_data->touch_dev, RT_DEVICE_FLAG_RDWR);
-    RT_ASSERT(ret == RT_EOK);
-
     olpc_ebook_screen_touch_register(olpc_data);
 #endif
 
@@ -799,7 +789,6 @@ static void olpc_ebook_thread(void *p)
     /* Thread deinit */
 #if defined(RT_USING_TOUCH)
     olpc_ebook_screen_touch_unregister(olpc_data);
-    rt_device_close(olpc_data->touch_dev);
 #endif
 
     olpc_ebook_deinit(olpc_data);
