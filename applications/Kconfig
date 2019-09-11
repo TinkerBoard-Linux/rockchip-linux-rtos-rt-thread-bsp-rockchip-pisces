@@ -12,10 +12,6 @@ if RT_USING_OLPC_DEMO
         config OLPC_APP_CLOCK_ENABLE
             bool "olpc clock demo enable"
 
-        config OLPC_LVGL_CLOCK_ENABLE
-            bool "olpc lvgl GUI clock demo enable"
-            depends on RT_USING_LITTLEVGL2RTT
-
         config OLPC_APP_EBOOK_ENABLE
             bool "olpc ebook demo enable"
     endchoice
