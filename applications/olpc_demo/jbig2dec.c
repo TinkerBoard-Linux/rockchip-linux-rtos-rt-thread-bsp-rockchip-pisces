@@ -681,6 +681,18 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
     rt_int16_t height = img_info->h;
     size_t length = img_info->size;
 
+    // Initial buffer(clear)
+    {
+        rt_uint16_t x, y;
+        for (y = yoffset; y < yoffset + height; y++)
+        {
+            for (x = xoffset / 8; x < (xoffset + width + 7) / 8; x++)
+            {
+                fb[y * (xVir >> 3) + x] = 0;
+            }
+        }
+    }
+
     ctx = jbig2_ctx_new(NULL);
     if (NULL == ctx)
     {
@@ -833,7 +845,7 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
                 }
             }
             line2 = line1;
-            line1 = fb + (xVir / 8) * y;
+            line1 = fb + (xVir / 8) * (y + yoffset) + (xoffset >> 3);
         }
 
     }
