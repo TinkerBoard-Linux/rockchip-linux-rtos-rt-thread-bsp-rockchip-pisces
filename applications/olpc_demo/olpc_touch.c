@@ -150,6 +150,7 @@ rt_err_t iterate_touch_item_list(struct olpc_touch_item *header, struct point_in
             }
             touch_item = touch_item->next;
         }
+        return RT_EOK;
     }
 
     // touch probe, check if touch occurs
