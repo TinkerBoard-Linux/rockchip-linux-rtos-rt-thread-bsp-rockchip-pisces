@@ -74,7 +74,7 @@
 /**
  * @brief  Config iomux for PDM
  */
-void pdm_iomux_config(void)
+static void pdm_iomux_config(void)
 {
     // for pdm input
     HAL_PINCTRL_SetIOMUX(GPIO_BANK0,
@@ -95,7 +95,7 @@ void pdm_iomux_config(void)
 /**
  * @brief  Config iomux for I2S
  */
-void i2s_iomux_config(void)
+RT_UNUSED static void i2s_iomux_config(void)
 {
     // for i2s input
     HAL_PINCTRL_SetIOMUX(GPIO_BANK0,

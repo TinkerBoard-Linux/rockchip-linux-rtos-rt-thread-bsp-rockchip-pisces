@@ -17,8 +17,6 @@
 #ifndef __BOARD_IOMUX_H__
 #define __BOARD_IOMUX_H__
 
-void pdm_iomux_config(void);
-void i2s_iomux_config(void);
 void rt_hw_iomux_config(void);
 
 #endif
