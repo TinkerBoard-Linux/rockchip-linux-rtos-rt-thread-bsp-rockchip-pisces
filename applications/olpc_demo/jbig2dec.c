@@ -680,13 +680,49 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
     rt_int16_t width = img_info->w;
     rt_int16_t height = img_info->h;
     size_t length = img_info->size;
+    rt_uint8_t *headbuf = RT_NULL;
+    rt_uint8_t *tailbuf = RT_NULL;
+    rt_uint16_t align8_x1, align8_x2;
+    rt_uint8_t  mod8_x1, mod8_x2;
 
     // Initial buffer(clear)
+    align8_x1 = xoffset / 8;
+    align8_x2 = (xoffset + img_info->w + 7) / 8;
+    mod8_x1   = xoffset % 8;
+    mod8_x2   = (xoffset + img_info->w) % 8;
+    //rt_kprintf("xoffset   = %d, width     = %d\n", xoffset, width);
+    //rt_kprintf("align8_x1 = %d, align8_x2 = %d\n", align8_x1, align8_x2);
+    //rt_kprintf("mod8_x1   = %d, mod8_x2   = %d\n", mod8_x1, mod8_x2);
     {
         rt_uint16_t x, y;
+
+        if (mod8_x1 != 0)
+        {
+            headbuf = rt_malloc(height);
+            RT_ASSERT(headbuf != RT_NULL);
+        }
+
+        if (mod8_x2 != 0)
+        {
+            tailbuf = rt_malloc(height);
+            RT_ASSERT(tailbuf != RT_NULL);
+        }
+
         for (y = yoffset; y < yoffset + height; y++)
         {
-            for (x = xoffset / 8; x < (xoffset + width + 7) / 8; x++)
+            // Backup left margin if not align8
+            if (mod8_x1 != 0)
+            {
+                headbuf[y - yoffset] = fb[y * (xVir >> 3) + align8_x1];
+            }
+
+            // Backup right margin if not align8
+            if (mod8_x2 != 0)
+            {
+                tailbuf[y - yoffset] = fb[y * (xVir >> 3) + (align8_x2 - 1)];
+            }
+
+            for (x = align8_x1; x < align8_x2; x++)
             {
                 fb[y * (xVir >> 3) + x] = 0;
             }
@@ -741,7 +777,7 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
             uint32_t CONTEXT;
             uint32_t line_m1;
             uint32_t line_m2;
-            uint32_t padded_width = (GBW + 7) & -8;
+            uint32_t padded_width = (GBW + 7) & (-8);
             int code_t = 0;
 
 #if CONTEXT_13
@@ -762,7 +798,7 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
                 unsigned char result = 0;
 #endif
                 int x_minor;
-                int minor_width = GBW - x > 8 ? 8 : GBW - x;
+                int minor_width = (GBW - x) > 8 ? 8 : GBW - x;
 
                 if (line1)
                     line_m1 = (line_m1 << 8) | (x + 8 < GBW ? line1[(x >> 3) + 1] : 0);
@@ -849,6 +885,44 @@ int jbig2_decompression(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir,
         }
 
     }
+
+    // Restore left margin if not align8 & shift the decode result
+    if (mod8_x1 != 0)
+    {
+        rt_uint16_t x, y;
+        rt_uint8_t bitmask = 0xff >> (mod8_x1);
+        for (y = yoffset; y < yoffset + height; y++)
+        {
+            rt_uint8_t temp  = 0;
+            rt_uint8_t shift = headbuf[y - yoffset] & (rt_uint8_t)(~bitmask);
+            for (x = align8_x1; x < align8_x2; x++)
+            {
+                temp = fb[y * (xVir >> 3) + x];
+
+                fb[y * (xVir >> 3) + x] >>= mod8_x1;
+                fb[y * (xVir >> 3) + x]  |= shift;
+
+                shift = temp << (8 - mod8_x1);
+
+            }
+        }
+        rt_free(headbuf);
+    }
+
+    // Restore right margin if not align8
+    if (mod8_x2 != 0)
+    {
+        rt_uint16_t y;
+        for (y = yoffset; y < yoffset + height; y++)
+        {
+            rt_uint8_t bitmask = 0xff << (8 - mod8_x2);
+            tailbuf[y - yoffset] &= (~bitmask);
+            fb[y * (xVir >> 3) + (align8_x2 - 1)] &= bitmask;
+            fb[y * (xVir >> 3) + (align8_x2 - 1)] |= tailbuf[y - yoffset];
+        }
+        rt_free(tailbuf);
+    }
+
     jbig2_free(ctx->allocator, as);
     jbig2_free(ctx->allocator, ws);
     jbig2_free(ctx->allocator, GB_stats);

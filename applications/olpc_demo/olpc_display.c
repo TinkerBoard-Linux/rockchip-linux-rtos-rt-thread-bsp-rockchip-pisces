@@ -421,7 +421,6 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
             ret = jbig2_decompression(img_info, fb, xVir, xoffset, yoffset);
             RT_ASSERT(ret == 0);
         }
-
     }
     else //if (img_info->type == IMG_TYPE_RAW)
     {
@@ -454,16 +453,16 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
                 for (y = yoffset; y < yoffset + img_info->h; y++)
                 {
                     i = (y - yoffset) * ((img_info->w + 7) / 8);
-                    for (x = xoffset; x < xoffset + img_info->w; x += 8)
+                    for (x = xoffset / 8; x < (xoffset + img_info->w) / 8; x++)
                     {
-                        fb[y * (xVir / 8) + x / 8] = img_info->data[i++];
+                        fb[y * (xVir / 8) + x] = img_info->data[i++];
                     }
 
-                    if ((img_info->w % 8) == 0)
+                    if (((xoffset + img_info->w) % 8) != 0)
                     {
                         rt_uint8_t maskval = 0xff >> (img_info->w % 8);
-                        fb[y * (xVir / 8) + x / 8] &= maskval;
-                        fb[y * (xVir / 8) + x / 8] |= (img_info->data[i++] & (~maskval));
+                        fb[y * (xVir / 8) + x] &= maskval;
+                        fb[y * (xVir / 8) + x] |= (img_info->data[i++] & (~maskval));
                     }
                 }
             }
