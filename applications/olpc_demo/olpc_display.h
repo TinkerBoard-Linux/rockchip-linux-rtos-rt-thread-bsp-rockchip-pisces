@@ -90,9 +90,10 @@ extern uint32_t bpp_lut[256];
 /**
  * display rotate.
  */
-void rt_display_rotate(float angle, int w, int h,
-                       unsigned char *src, unsigned char *dst,
-                       int dst_str, int xcen, int ycen);
+void rt_display_rotate_4bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen);
+void rt_display_rotate_8bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen);
+void rt_display_rotate_16bit(float angle, int w, int h, unsigned short *src, unsigned short *dst, int dst_str, int xcen, int ycen);
+void rt_display_rotate_24bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen);
 
 /**
  * color palette for RGB332 and BGR233,default format is RGB332.

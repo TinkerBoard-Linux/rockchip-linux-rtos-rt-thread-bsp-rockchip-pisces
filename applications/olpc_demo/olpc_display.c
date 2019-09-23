@@ -208,7 +208,7 @@ static int rt_display_decompress(image_info_t *img_info, rt_uint8_t *fb, rt_int3
  * unsigned char *dst :
  * int dst_str :
 */
-static unsigned char rt_display_SegGradSelect(int x, int y, int w, int h, int x_res, int y_res, unsigned char *data, unsigned char *src)
+static unsigned char rt_display_SegGradSelect_8bit(int x, int y, int w, int h, int x_res, int y_res, unsigned char *data, unsigned char *src)
 {
     unsigned char alpha = 0xff;
     int pos = 0;
@@ -259,10 +259,173 @@ static unsigned char rt_display_SegGradSelect(int x, int y, int w, int h, int x_
     return alpha;
 }
 
+static unsigned char rt_display_SegGradSelect_16bit(int x, int y, int w, int h, int x_res, int y_res, unsigned short *data, unsigned short *src)
+{
+    unsigned char alpha = 0xff;
+    int pos = 0;
+    if (x == -1 && y == -1)
+    {
+        alpha = (x_res * y_res) >> 8;
+        pos = (y + 1) * w + (x + 1);
+    }
+    else if (x == w && y == -1)
+    {
+        alpha = ((255 - x_res) * y_res) >> 8;
+        pos = (y + 1) * w + (x - 1);
+    }
+    else if (x == -1 && y == h)
+    {
+        alpha = ((x_res) * (255 - y_res)) >> 8;
+        pos = (y - 1) * w + (x + 1);
+    }
+    else if (x == w && y == h)
+    {
+        alpha = ((255 - x_res) * (255 - y_res)) >> 8;
+        *data = src[(y - 1) * w + (x - 1)];
+    }
+    else if (x == -1 && y > -1 && y < h)
+    {
+        alpha = x_res;
+        pos = y * w + (x + 1);
+    }
+    else if (y == -1 && x > -1 && x < w)
+    {
+        alpha = y_res;
+        pos = (y + 1) * w + x;
+    }
+    else if (x == w && y > -1 && y < h)
+    {
+        alpha = 255 - x_res;
+        pos = y * w + x - 1;
+    }
+    else if (y == h && x > -1 && x < w)
+    {
+        alpha = 255 - y_res;
+        pos = (y - 1) * w + x;
+    }
+
+    *data = src[pos];
+
+    return alpha;
+}
+
+static unsigned char rt_display_SegGradSelect_4bit(int x, int y, int w, int h, int x_res, int y_res, unsigned char *data, unsigned char *src)
+{
+    unsigned char alpha = 0xff;
+    int pos = 0;
+    if (x == -1 && y == -1)
+    {
+        alpha = (x_res * y_res) >> 8;
+        pos = (y + 1) * w + (x + 1);
+    }
+    else if (x == w && y == -1)
+    {
+        alpha = ((255 - x_res) * y_res) >> 8;
+        pos = (y + 1) * w + (x - 1);
+    }
+    else if (x == -1 && y == h)
+    {
+        alpha = ((x_res) * (255 - y_res)) >> 8;
+        pos = (y - 1) * w + (x + 1);
+    }
+    else if (x == w && y == h)
+    {
+        alpha = ((255 - x_res) * (255 - y_res)) >> 8;
+        *data = src[(y - 1) * w + (x - 1)];
+    }
+    else if (x == -1 && y > -1 && y < h)
+    {
+        alpha = x_res;
+        pos = y * w + (x + 1);
+    }
+    else if (y == -1 && x > -1 && x < w)
+    {
+        alpha = y_res;
+        pos = (y + 1) * w + x;
+    }
+    else if (x == w && y > -1 && y < h)
+    {
+        alpha = 255 - x_res;
+        pos = y * w + x - 1;
+    }
+    else if (y == h && x > -1 && x < w)
+    {
+        alpha = 255 - y_res;
+        pos = (y - 1) * w + x;
+    }
+
+    if ((pos & 1) == 0)
+        *data = src[pos];
+
+    return alpha;
+}
+
+
 /**
  * display rotate.
  */
-void rt_display_rotate(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
+void rt_display_rotate_24bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
+{
+    int x, y;
+
+    int xlt, xrt, xld, xrd;
+    int ylt, yrt, yld, yrd;
+    int xmin, xmax, ymin, ymax;
+
+    float cosa = cos((angle * PI) / 180);
+    float sina = sin((angle * PI) / 180);
+
+    xlt = cosa * (-xcen) + -sina * (-ycen);
+    ylt = sina * (-xcen) +  cosa * (-ycen);
+    xrt = cosa * (w - xcen) + -sina * (-ycen);
+    yrt = sina * (w - xcen) +  cosa * (-ycen);
+    xld = cosa * (-xcen) + -sina * (h - ycen);
+    yld = sina * (-xcen) +  cosa * (h - ycen);
+    xrd = cosa * (w - xcen) + -sina * (h - ycen);
+    yrd = sina * (w - xcen) +  cosa * (h - ycen);
+
+    xmin = MIN(xrd, MIN(xld, MIN(xlt, xrt))) - 1;
+    xmax = MAX(xrd, MAX(xld, MAX(xlt, xrt))) + 1;
+    ymin = MIN(yrd, MIN(yld, MIN(ylt, yrt))) - 1;
+    ymax = MAX(yrd, MAX(yld, MAX(ylt, yrt))) + 1;
+
+    float x_pos, y_pos;
+    unsigned char alpha;
+    //int cur_x_pos;
+    //int cur_y_pos;
+
+    int m = ymin;
+    for (int j = ymin; j < ymax; j++)
+    {
+        int n = xmin;
+        for (int i = xmin; i < xmax; i++)
+        {
+            x_pos = (cosa * i + sina * j) + xcen;
+            y_pos = (-sina * i + cosa * j) + ycen;
+            x = floor(x_pos);
+            y = floor(y_pos);
+
+            if (x_pos >= 0 && x_pos < w && y_pos >= 0 && y_pos < h)
+            {
+                dst[m * dst_str + n] = src[y * w + x];
+            }
+            else if ((x >= -1) && (y >= -1) && (x <= w) && (y <= h))
+            {
+                int x_res = (x_pos - x) * (1 << 8);
+                int y_res = (y_pos - y) * (1 << 8);
+                unsigned char data;
+
+                alpha = rt_display_SegGradSelect_8bit(x, y, w, h, x_res, y_res, &data, src);
+
+                dst[m * dst_str + n] = (dst[m * dst_str + n] * (255 - alpha) + data * alpha) >> 8;
+            }
+            n++;
+        }
+        m++;
+    }
+}
+
+void rt_display_rotate_8bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
 {
     int x, y;
 
@@ -311,7 +474,161 @@ void rt_display_rotate(float angle, int w, int h, unsigned char *src, unsigned c
                 int y_res = (y_pos - y) * (1 << 8);
                 unsigned char data = 0;
 
-                alpha = rt_display_SegGradSelect(x, y, w, h, x_res, y_res, &data, src);
+                alpha = rt_display_SegGradSelect_8bit(x, y, w, h, x_res, y_res, &data, src);
+
+                unsigned char sr, sg, sb, dr, dg, db;
+                sr = (dst[m * dst_str + n]) & 0x7;
+                sg = (dst[m * dst_str + n] >> 3) & 0x7;
+                sb = (dst[m * dst_str + n] >> 6) & 0x3;
+
+                dr = (data) & 0x7;
+                dg = (data >> 3) & 0x7;
+                db = (data >> 6) & 0x3;
+
+                dr = (sr * (255 - alpha) + dr * alpha) >> 8;
+                dg = (sg * (255 - alpha) + dg * alpha) >> 8;
+                db = (sb * (255 - alpha) + db * alpha) >> 8;
+
+                dst[m * dst_str + n] = dr | (dg << 3) | (db << 6);
+            }
+            n++;
+        }
+        m++;
+    }
+}
+
+void rt_display_rotate_16bit(float angle, int w, int h, unsigned short *src, unsigned short *dst, int dst_str, int xcen, int ycen)
+{
+    int x, y;
+
+    int xlt, xrt, xld, xrd;
+    int ylt, yrt, yld, yrd;
+    int xmin, xmax, ymin, ymax;
+
+    float cosa = cos((angle * PI) / 180);
+    float sina = sin((angle * PI) / 180);
+
+    xlt = cosa * (-xcen) + -sina * (-ycen);
+    ylt = sina * (-xcen) +  cosa * (-ycen);
+    xrt = cosa * (w - xcen) + -sina * (-ycen);
+    yrt = sina * (w - xcen) +  cosa * (-ycen);
+    xld = cosa * (-xcen) + -sina * (h - ycen);
+    yld = sina * (-xcen) +  cosa * (h - ycen);
+    xrd = cosa * (w - xcen) + -sina * (h - ycen);
+    yrd = sina * (w - xcen) +  cosa * (h - ycen);
+
+    xmin = MIN(xrd, MIN(xld, MIN(xlt, xrt))) - 1;
+    xmax = MAX(xrd, MAX(xld, MAX(xlt, xrt))) + 1;
+    ymin = MIN(yrd, MIN(yld, MIN(ylt, yrt))) - 1;
+    ymax = MAX(yrd, MAX(yld, MAX(ylt, yrt))) + 1;
+
+    float x_pos, y_pos;
+    unsigned char alpha;
+
+    int m = ymin;
+    for (int j = ymin; j < ymax; j++)
+    {
+        int n = xmin;
+        for (int i = xmin; i < xmax; i++)
+        {
+            x_pos = (cosa * i + sina * j) + xcen;
+            y_pos = (-sina * i + cosa * j) + ycen;
+            x = floor(x_pos);
+            y = floor(y_pos);
+
+            if (x_pos >= 0 && x_pos < w && y_pos >= 0 && y_pos < h)
+            {
+                dst[m * dst_str + n] = src[y * w + x];
+            }
+            else if ((x >= -1) && (y >= -1) && (x <= w) && (y <= h))
+            {
+                int x_res = (x_pos - x) * (1 << 8);
+                int y_res = (y_pos - y) * (1 << 8);
+                unsigned short data = 0;
+
+                alpha = rt_display_SegGradSelect_16bit(x, y, w, h, x_res, y_res, &data, src);
+
+                unsigned char sr, sg, sb, dr, dg, db;
+                sr = (dst[m * dst_str + n]) & 0x1f;
+                sg = (dst[m * dst_str + n] >> 5) & 0x3f;
+                sb = (dst[m * dst_str + n] >> 11) & 0x1f;
+
+                dr = (data) & 0x1f;
+                dg = (data >> 5) & 0x3f;
+                db = (data >> 11) & 0x1f;
+
+                dr = (sr * (255 - alpha) + dr * alpha) >> 8;
+                dg = (sg * (255 - alpha) + dg * alpha) >> 8;
+                db = (sb * (255 - alpha) + db * alpha) >> 8;
+
+                dst[m * dst_str + n] = dr | (dg << 5) | (db << 11);
+            }
+            n++;
+        }
+        m++;
+    }
+}
+
+void rt_display_rotate_4bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
+{
+    int x, y;
+
+    int xlt, xrt, xld, xrd;
+    int ylt, yrt, yld, yrd;
+    int xmin, xmax, ymin, ymax;
+
+    float cosa = cos((angle * PI) / 180);
+    float sina = sin((angle * PI) / 180);
+
+    xlt = cosa * (-xcen) + -sina * (-ycen);
+    ylt = sina * (-xcen) +  cosa * (-ycen);
+    xrt = cosa * (w - xcen) + -sina * (-ycen);
+    yrt = sina * (w - xcen) +  cosa * (-ycen);
+    xld = cosa * (-xcen) + -sina * (h - ycen);
+    yld = sina * (-xcen) +  cosa * (h - ycen);
+    xrd = cosa * (w - xcen) + -sina * (h - ycen);
+    yrd = sina * (w - xcen) +  cosa * (h - ycen);
+
+    xmin = MIN(xrd, MIN(xld, MIN(xlt, xrt))) - 1;
+    xmax = MAX(xrd, MAX(xld, MAX(xlt, xrt))) + 1;
+    ymin = MIN(yrd, MIN(yld, MIN(ylt, yrt))) - 1;
+    ymax = MAX(yrd, MAX(yld, MAX(ylt, yrt))) + 1;
+
+    float x_pos, y_pos;
+    unsigned char alpha;
+
+    int m = ymin;
+    for (int j = ymin; j < ymax; j++)
+    {
+        int n = xmin;
+        for (int i = xmin; i < xmax; i++)
+        {
+            x_pos = (cosa * i + sina * j) + xcen;
+            y_pos = (-sina * i + cosa * j) + ycen;
+            x = floor(x_pos);
+            y = floor(y_pos);
+
+            int dst_pos = ((m * dst_str) + n) >> 1;
+            int src_pos = ((y * w >> 1) + x) >> 1;
+
+            if (x_pos >= 0 && x_pos < w && y_pos >= 0 && y_pos < h)
+            {
+                if ((x & 1) == 0)
+                {
+                    dst[dst_pos] = (dst[dst_pos] & 0xf0) | ((src[src_pos] & 0xf));
+                }
+                else
+                {
+                    dst[dst_pos] = (dst[dst_pos] & 0x0f) | ((src[src_pos] & 0xf) << 4);
+                }
+            }
+            else if ((x >= -1) && (y >= -1) && (x <= w) && (y <= h))
+            {
+                int x_res = (x_pos - x) * (1 << 8);
+                int y_res = (y_pos - y) * (1 << 8);
+                unsigned char data = 0;
+
+                alpha = rt_display_SegGradSelect_4bit(x, y, w, h, x_res, y_res, &data, src);
 
                 unsigned char sr, sg, sb, dr, dg, db;
                 sr = (dst[m * dst_str + n]) & 0x7;

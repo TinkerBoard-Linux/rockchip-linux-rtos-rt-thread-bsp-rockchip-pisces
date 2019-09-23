@@ -27,8 +27,11 @@ if RT_USING_OLPC_DEMO
             config OLPC_APP_CLOCK_STYLE_ROUND_ARABIC
                 bool "select round disc with Arabic number"
 
-            config OLPC_APP_CLOCK_STYLE_ROUND_ROMAN
-                bool "select round disc with Roman number"
+            config OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332
+                bool "select round disc with Roman number base on RGB332"
+
+            config OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565
+                bool "select round disc with Roman number base on RGB565"
         endchoice
     endif
 
