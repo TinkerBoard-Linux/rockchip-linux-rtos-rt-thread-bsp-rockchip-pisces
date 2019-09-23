@@ -51,8 +51,6 @@ static uint32_t bpp1_lut[2] =
 #define CTRL_FB_W           ((WIN_LAYERS_W / 32) * 32)    /* control frame buffer w */
 #define CTRL_FB_H           CTRL_REGION_H                 /* control frame buffer h */
 
-#define BLOCK_TIMER_PERIOD  (RT_TICK_PER_SECOND / 10)     /* 100ms */
-
 /* Event define */
 #define EVENT_DISPLAY_REFRESH   (0x01UL << 0)
 #define EVENT_GAME_PROCESS      (0x01UL << 1)
@@ -147,8 +145,6 @@ struct olpc_block_data
     rt_event_t  event;
     rt_uint32_t cmd;
     rt_uint32_t gamecmd;
-    rt_timer_t  timer;
-    rt_uint32_t ticks;
 
     rt_uint8_t *block_fb;
     rt_uint32_t block_fblen;
@@ -1815,20 +1811,6 @@ static rt_err_t olpc_block_touch_unregister(void *parameter)
  */
 
 /**
- * olpc block demo timer callback.
- */
-static void olpc_block_timer_callback(void *parameter)
-{
-    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
-
-    olpc_data->ticks += BLOCK_TIMER_PERIOD;
-    if ((olpc_data->ticks % BLOCK_TIMER_PERIOD) != 0)
-    {
-        olpc_data->ticks = (olpc_data->ticks / BLOCK_TIMER_PERIOD) * BLOCK_TIMER_PERIOD;
-    }
-}
-
-/**
  * olpc block dmeo thread.
  */
 static void olpc_block_thread(void *p)
@@ -1841,9 +1823,6 @@ static void olpc_block_thread(void *p)
     olpc_data = (struct olpc_block_data *)rt_malloc(sizeof(struct olpc_block_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_block_data));
-
-    olpc_data->ticks = 0;
-    olpc_data->cmd   = 0;
 
     /* init bpp_lut[256] */
     //rt_display_update_lut(FORMAT_RGB_332);
@@ -1871,15 +1850,6 @@ static void olpc_block_thread(void *p)
     olpc_block_touch_register(olpc_data);
 #endif
 
-    olpc_data->timer = rt_timer_create("block_timer",
-                                       olpc_block_timer_callback,
-                                       (void *)olpc_data,
-                                       BLOCK_TIMER_PERIOD,
-                                       RT_TIMER_FLAG_PERIODIC);
-    RT_ASSERT(olpc_data->timer != RT_NULL);
-
-    //rt_timer_start(olpc_data->timer);
-
     while (1)
     {
         ret = rt_event_recv(olpc_data->event, EVENT_GAME_PROCESS | EVENT_DISPLAY_REFRESH,
@@ -1904,12 +1874,6 @@ static void olpc_block_thread(void *p)
     }
 
     /* Thread deinit */
-    //ret = rt_timer_stop(olpc_data->timer);
-    //RT_ASSERT(ret == RT_EOK);
-
-    ret = rt_timer_delete(olpc_data->timer);
-    RT_ASSERT(ret == RT_EOK);
-
 #if defined(RT_USING_TOUCH)
     olpc_block_touch_unregister(olpc_data);
 #endif
