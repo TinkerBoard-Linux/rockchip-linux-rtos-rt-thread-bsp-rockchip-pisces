@@ -156,4 +156,10 @@ void rt_display_deinit(rt_display_data_t disp_data);
  */
 rt_uint16_t rt_display_get_bl_max(rt_device_t device);
 
+/**
+ * screen protection API.
+ */
+int olpc_srcprotect_app_init(void);
+void olpc_srcprotect_app_start(rt_err_t (*exithook)(void *parameter), void *parameter);
+
 #endif

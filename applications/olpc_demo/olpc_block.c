@@ -35,7 +35,6 @@ static uint32_t bpp1_lut[2] =
  **************************************************************************************************
  */
 #define BLOCK_GRAY1_WIN     0
-#define CTRL_GRAY1_WIN      1
 
 #define BLOCK_REGION_X      0
 #define BLOCK_REGION_Y      60
@@ -54,6 +53,8 @@ static uint32_t bpp1_lut[2] =
 /* Event define */
 #define EVENT_DISPLAY_REFRESH   (0x01UL << 0)
 #define EVENT_GAME_PROCESS      (0x01UL << 1)
+#define EVENT_SRCSAVER_ENTER    (0x01UL << 2)
+#define EVENT_SRCSAVER_EXIT     (0x01UL << 3)
 
 /* Game command define */
 #define CMD_GAME_MOVE_DOWN      (0x01UL << 0)
@@ -80,6 +81,7 @@ static uint32_t bpp1_lut[2] =
 #define CMD_UPDATE_CTRL_LEFT    (0x01UL << 16)
 #define CMD_UPDATE_CTRL_RIGHT   (0x01UL << 17)
 
+#define BLOCK_SRCSAVER_TIME     (RT_TICK_PER_SECOND * 15)
 /*
  **************************************************************************************************
  *
@@ -132,6 +134,11 @@ static void block_game_draw_next(void *parameter);
 static void block_game_show_speed(void *parameter);
 static void block_game_show_over(void *parameter);
 
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+static void olpc_block_screen_timer_start(void *parameter);
+static void olpc_block_screen_timer_stop(void *parameter);
+#endif
+
 /*
  **************************************************************************************************
  *
@@ -142,6 +149,8 @@ static void block_game_show_over(void *parameter);
 struct olpc_block_data
 {
     rt_display_data_t disp;
+    rt_timer_t    srctimer;
+
     rt_event_t  event;
     rt_uint32_t cmd;
     rt_uint32_t gamecmd;
@@ -217,6 +226,7 @@ unsigned char BlockGameState;
 unsigned int  MoveBlock_X;
 unsigned int  MoveBlock_Y;
 unsigned int  BlockFlashing;
+unsigned int  BlockGameover = 0;
 
 rt_timer_t    m_blockTimerID;
 
@@ -335,6 +345,7 @@ static void BlockValueInit(void)
     MoveBlock_X          = BLOCK_INIT_POS_X;
     MoveBlock_Y          = 0;
     BlockFlashing        = 0;
+    BlockGameover        = 0;
 }
 
 static unsigned int BlockInsert(void)
@@ -710,7 +721,7 @@ static void block_game_move_right(void *parameter)
  */
 static void block_game_move_down(void *parameter)
 {
-    unsigned int temp, gameover = 0;
+    unsigned int temp;
     struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
 
     if ((BlockGameState != BLOCKGAME_RUN) || (BlockFlashing == 1))
@@ -718,8 +729,8 @@ static void block_game_move_down(void *parameter)
         return;
     }
 
+    BlockGameover = 0;
     temp = MoveBlock_Y;
-
     MoveBlock_Y++;
     if (BlockChk(BlockAspect, MoveBlock_X, temp))
     {
@@ -746,7 +757,7 @@ static void block_game_move_down(void *parameter)
 
         if (BlockGetNewBlock())
         {
-            gameover = 1;
+            BlockGameover = 1;
 
             block_game_stop(olpc_data);  //game over
             block_game_show_hiscore(olpc_data);
@@ -757,7 +768,7 @@ static void block_game_move_down(void *parameter)
 
     block_game_draw_block(olpc_data);
 
-    if (gameover)
+    if (BlockGameover)
     {
         block_game_show_over(olpc_data);
     }
@@ -768,7 +779,7 @@ static void block_game_move_down(void *parameter)
  */
 static void block_game_drop_down(void *parameter)
 {
-    unsigned int temp, gameover = 0;
+    unsigned int temp;
     struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
 
     if ((BlockGameState != BLOCKGAME_RUN) || (BlockFlashing == 1))
@@ -776,6 +787,7 @@ static void block_game_drop_down(void *parameter)
         return;
     }
 
+    BlockGameover = 0;
     do
     {
         block_game_draw_block(olpc_data);
@@ -808,7 +820,7 @@ static void block_game_drop_down(void *parameter)
 
     if (BlockGetNewBlock())
     {
-        gameover = 1;
+        BlockGameover = 1;
 
         block_game_stop(olpc_data);  //game over
         block_game_show_hiscore(olpc_data);
@@ -817,7 +829,7 @@ static void block_game_drop_down(void *parameter)
     block_game_draw_block(olpc_data);
     block_game_draw_next(olpc_data);
 
-    if (gameover)
+    if (BlockGameover)
     {
         block_game_show_over(olpc_data);
     }
@@ -842,6 +854,10 @@ static void block_game_start(void *parameter)
         ret = rt_timer_start(m_blockTimerID);
         RT_ASSERT(ret == RT_EOK);
         BlockGameState = BLOCKGAME_RUN;
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+        olpc_block_screen_timer_stop(parameter);
+#endif
     }
 }
 
@@ -858,6 +874,10 @@ static void block_game_pause(void *parameter)
 
         ret = rt_timer_start(m_blockTimerID);
         RT_ASSERT(ret == RT_EOK);
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+        olpc_block_screen_timer_stop(parameter);
+#endif
     }
     else if (BlockGameState == BLOCKGAME_RUN)
     {
@@ -865,6 +885,10 @@ static void block_game_pause(void *parameter)
 
         ret = rt_timer_stop(m_blockTimerID);
         RT_ASSERT(ret == RT_EOK);
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+        olpc_block_screen_timer_start(parameter);
+#endif
     }
 }
 
@@ -881,6 +905,10 @@ static void block_game_stop(void *parameter)
         {
             ret = rt_timer_stop(m_blockTimerID);
             RT_ASSERT(ret == RT_EOK);
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+            olpc_block_screen_timer_start(parameter);
+#endif
         }
         BlockGameState = BLOCKGAME_STOP;
     }
@@ -1076,8 +1104,19 @@ static rt_err_t olpc_block_init(struct olpc_block_data *olpc_data)
     RT_ASSERT((wincfg.fblen) <= olpc_data->block_fblen);
 
     //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+    {
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_sync_hook(device);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+        RT_ASSERT(ret == RT_EOK);
+    }
 
     olpc_data->cmd = CMD_UPDATE_GAME | CMD_UPDATE_GAME_BK | CMD_UPDATE_CTRL | CMD_UPDATE_CTRL_BK;
     rt_event_send(olpc_data->event, EVENT_DISPLAY_REFRESH);
@@ -1111,8 +1150,6 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
-
-    rt_display_sync_hook(device);
 
     rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
     wincfg.winId = BLOCK_GRAY1_WIN;
@@ -1300,8 +1337,19 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
     }
 
     //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+    {
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_sync_hook(device);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+        RT_ASSERT(ret == RT_EOK);
+    }
 
     return RT_EOK;
 }
@@ -1321,10 +1369,8 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_display_sync_hook(device);
-
     rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-    wincfg.winId = CTRL_GRAY1_WIN;
+    wincfg.winId = BLOCK_GRAY1_WIN;
     wincfg.fb    = olpc_data->ctrl_fb;
     wincfg.w     = ((CTRL_FB_W + 31) / 32) * 32;
     wincfg.h     = CTRL_FB_H;
@@ -1445,8 +1491,20 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
     }
 
     //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+    {
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_sync_hook(device);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+        RT_ASSERT(ret == RT_EOK);
+    }
+
     return RT_EOK;
 }
 
@@ -1455,12 +1513,6 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
  */
 static rt_err_t olpc_block_task_fun(struct olpc_block_data *olpc_data)
 {
-    rt_err_t ret;
-    rt_device_t  device = olpc_data->disp->device;
-
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-    RT_ASSERT(ret == RT_EOK);
-
     if ((olpc_data->cmd & CMD_UPDATE_GAME) == CMD_UPDATE_GAME)
     {
         olpc_data->cmd &= ~CMD_UPDATE_GAME;
@@ -1471,17 +1523,6 @@ static rt_err_t olpc_block_task_fun(struct olpc_block_data *olpc_data)
         olpc_data->cmd &= ~CMD_UPDATE_CTRL;
         olpc_block_ctrl_region_refresh(olpc_data);
 
-    }
-
-    ret = rt_display_sync_hook(device);
-    RT_ASSERT(ret == RT_EOK);
-
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-    RT_ASSERT(ret == RT_EOK);
-
-    if (olpc_data->cmd != 0)
-    {
-        rt_event_send(olpc_data->event, EVENT_DISPLAY_REFRESH);
     }
 
     return RT_EOK;
@@ -1800,6 +1841,155 @@ static rt_err_t olpc_block_touch_unregister(void *parameter)
     return RT_EOK;
 }
 
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+static image_info_t screen_item;
+static rt_err_t olpc_block_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
+{
+    rt_err_t ret = RT_ERROR;
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+
+    switch (event)
+    {
+    default:
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+        rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
+#endif
+        break;
+    }
+
+    return ret;
+}
+
+static rt_err_t olpc_block_screen_touch_register(void *parameter)
+{
+    image_info_t *img_info = &screen_item;
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* screen on button touch register */
+    {
+        screen_item.w = WIN_LAYERS_W;
+        screen_item.h = WIN_LAYERS_H;
+        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_block_screen_touch_callback, (void *)olpc_data, 0);
+        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), 0, 0, 0, 0);
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_block_screen_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = &screen_item;
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
+}
+#endif
+#endif
+
+/*
+ **************************************************************************************************
+ *
+ * olpc block screen protection functions
+ *
+ **************************************************************************************************
+ */
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+
+/**
+ * block screen protection timeout callback.
+ */
+static void olpc_block_srcprotect_timerISR(void *parameter)
+{
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+    rt_event_send(olpc_data->event, EVENT_SRCSAVER_ENTER);
+}
+
+/**
+ * exit screen protection hook.
+ */
+static rt_err_t olpc_block_screen_protection_hook(void *parameter)
+{
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+
+    rt_event_send(olpc_data->event, EVENT_SRCSAVER_EXIT);
+
+    return RT_EOK;
+}
+
+static void olpc_block_screen_timer_start(void *parameter)
+{
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+
+#if defined(RT_USING_TOUCH)
+    olpc_block_screen_touch_register(parameter);
+#endif
+
+    rt_timer_start(olpc_data->srctimer);
+}
+
+static void olpc_block_screen_timer_stop(void *parameter)
+{
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+
+    rt_timer_stop(olpc_data->srctimer);
+
+#if defined(RT_USING_TOUCH)
+    olpc_block_screen_touch_unregister(parameter);
+#endif
+}
+
+/**
+ * start screen protection.
+ */
+static rt_err_t olpc_block_screen_protection_enter(void *parameter)
+{
+    olpc_block_touch_unregister(parameter);
+    olpc_block_screen_timer_stop(parameter);
+
+    olpc_srcprotect_app_start(olpc_block_screen_protection_hook, parameter);
+
+    return RT_EOK;
+}
+
+/**
+ * exit screen protection.
+ */
+static rt_err_t olpc_block_screen_protection_exit(void *parameter)
+{
+    struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
+
+    olpc_block_touch_register(parameter);
+    olpc_block_screen_timer_start(parameter);
+
+    unsigned int i, j;
+    for (j = 0; j < BLOCKGAME_SCOPE_ROW; j++)
+    {
+        for (i = 0; i < BLOCKGAME_SCOPE_COL; i++)
+        {
+            BlockScopeBufBk[j][i] = 0x55;
+        }
+    }
+
+    olpc_data->cmd  = CMD_UPDATE_GAME | CMD_UPDATE_GAME_BK;
+    olpc_data->cmd |= CMD_UPDATE_GAME_SCORE | CMD_UPDATE_GAME_HSCORE;
+    olpc_data->cmd |= CMD_UPDATE_GAME_LEVEL | CMD_UPDATE_GAME_SPEED;
+    olpc_data->cmd |= CMD_UPDATE_GAME_NEXT | CMD_UPDATE_GAME_BLOCK;
+    if (BlockGameover)
+    {
+        olpc_data->cmd |= CMD_UPDATE_GAME_OVER;
+    }
+    rt_event_send(olpc_data->event, EVENT_GAME_PROCESS);
+
+    olpc_data->cmd |= CMD_UPDATE_CTRL | CMD_UPDATE_CTRL_BK;
+    olpc_data->cmd |= CMD_UPDATE_CTRL_PAUSE;
+    rt_event_send(olpc_data->event, EVENT_DISPLAY_REFRESH);
+
+    return RT_EOK;
+}
 #endif
 
 /*
@@ -1818,26 +2008,18 @@ static void olpc_block_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_block_data *olpc_data;
-    struct rt_display_lut blocklut, ctrlut;
+    struct rt_display_lut lut0;
 
     olpc_data = (struct olpc_block_data *)rt_malloc(sizeof(struct olpc_block_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_block_data));
 
-    /* init bpp_lut[256] */
-    //rt_display_update_lut(FORMAT_RGB_332);
+    lut0.winId  = BLOCK_GRAY1_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut0.lut    = bpp1_lut;
+    lut0.size   = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
 
-    blocklut.winId  = BLOCK_GRAY1_WIN;
-    blocklut.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    blocklut.lut    = bpp1_lut;
-    blocklut.size   = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    ctrlut.winId  = CTRL_GRAY1_WIN;
-    ctrlut.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    ctrlut.lut    = bpp1_lut;
-    ctrlut.size   = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    olpc_data->disp = rt_display_init(&blocklut, &ctrlut, RT_NULL);
+    olpc_data->disp = rt_display_init(&lut0, RT_NULL, RT_NULL);
     RT_ASSERT(olpc_data->disp != RT_NULL);
 
     olpc_data->event = rt_event_create("block_event", RT_IPC_FLAG_FIFO);
@@ -1850,9 +2032,20 @@ static void olpc_block_thread(void *p)
     olpc_block_touch_register(olpc_data);
 #endif
 
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+    olpc_data->srctimer = rt_timer_create("blockprotect",
+                                          olpc_block_srcprotect_timerISR,
+                                          (void *)olpc_data,
+                                          BLOCK_SRCSAVER_TIME,
+                                          RT_TIMER_FLAG_PERIODIC);
+    RT_ASSERT(olpc_data->srctimer != RT_NULL);
+    olpc_block_screen_timer_start(olpc_data);
+#endif
+
     while (1)
     {
-        ret = rt_event_recv(olpc_data->event, EVENT_GAME_PROCESS | EVENT_DISPLAY_REFRESH,
+        ret = rt_event_recv(olpc_data->event,
+                            EVENT_GAME_PROCESS | EVENT_DISPLAY_REFRESH | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         if (ret != RT_EOK)
@@ -1871,9 +2064,29 @@ static void olpc_block_thread(void *p)
             ret = olpc_block_task_fun(olpc_data);
             RT_ASSERT(ret == RT_EOK);
         }
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+        if (event & EVENT_SRCSAVER_ENTER)
+        {
+            ret = olpc_block_screen_protection_enter(olpc_data);
+            RT_ASSERT(ret == RT_EOK);
+        }
+
+        if (event & EVENT_SRCSAVER_EXIT)
+        {
+            ret = olpc_block_screen_protection_exit(olpc_data);
+            RT_ASSERT(ret == RT_EOK);
+        }
+#endif
     }
 
     /* Thread deinit */
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+    rt_timer_stop(olpc_data->srctimer);
+    ret = rt_timer_delete(olpc_data->srctimer);
+    RT_ASSERT(ret == RT_EOK);
+#endif
+
 #if defined(RT_USING_TOUCH)
     olpc_block_touch_unregister(olpc_data);
 #endif
@@ -1897,6 +2110,10 @@ int olpc_block_app_init(void)
     rtt_block = rt_thread_create("block", olpc_block_thread, RT_NULL, 2048 * 2, 5, 10);
     RT_ASSERT(rtt_block != RT_NULL);
     rt_thread_startup(rtt_block);
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+    olpc_srcprotect_app_init();
+#endif
 
     return RT_EOK;
 }

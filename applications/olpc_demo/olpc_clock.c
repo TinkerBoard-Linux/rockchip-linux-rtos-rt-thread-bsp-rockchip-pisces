@@ -26,8 +26,8 @@ static uint32_t bpp1_lut[2] =
  **************************************************************************************************
  */
 /* display win layers */
-#define CLOCK_RGB332_WIN    0
-#define CLOCK_GRAY1_WIN     1
+#define CLOCK_GRAY1_WIN     0
+#define CLOCK_RGB332_WIN    1
 #define CLOCK_RGB565_WIN    2
 
 /* display fb size */
@@ -1104,9 +1104,19 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     }
 
     //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+    {
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+        RT_ASSERT(ret == RT_EOK);
 
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_display_sync_hook(device);
+        RT_ASSERT(ret == RT_EOK);
+
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+        RT_ASSERT(ret == RT_EOK);
+    }
     return RT_EOK;
 }
 

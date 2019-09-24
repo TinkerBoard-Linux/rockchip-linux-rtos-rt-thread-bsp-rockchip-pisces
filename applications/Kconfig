@@ -5,18 +5,23 @@ menuconfig RT_USING_OLPC_DEMO
     default n
 
 if RT_USING_OLPC_DEMO
+    config OLPC_APP_SRCSAVER_ENABLE
+        bool "olpc screen saver enable"
+        default n
+
     choice
         prompt "olpc functions select"
         default OLPC_APP_CLOCK_ENABLE
 
         config OLPC_APP_CLOCK_ENABLE
-            bool "olpc clock demo enable"
+            bool "olpc clock demo select"
 
         config OLPC_APP_EBOOK_ENABLE
-            bool "olpc ebook demo enable"
+            bool "olpc ebook demo select"
 
         config OLPC_APP_BLOCK_ENABLE
-            bool "olpc block game enable"
+            bool "olpc block game select"
+
     endchoice
 
     if OLPC_APP_CLOCK_ENABLE

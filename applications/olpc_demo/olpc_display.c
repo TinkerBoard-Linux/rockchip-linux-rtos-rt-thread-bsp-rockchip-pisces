@@ -1055,6 +1055,12 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     struct rt_device_graphic_info info;
     struct crtc_lut_state lut_state;
 
+    if (g_disp_data != RT_NULL)
+    {
+        rt_kprintf("waring: rt_display already initialed!\n");
+        return g_disp_data;
+    }
+
     disp_data = (struct rt_display_data *)rt_malloc(sizeof(struct rt_display_data));
     RT_ASSERT(disp_data != RT_NULL);
     rt_memset((void *)disp_data, 0, sizeof(struct rt_display_data));
