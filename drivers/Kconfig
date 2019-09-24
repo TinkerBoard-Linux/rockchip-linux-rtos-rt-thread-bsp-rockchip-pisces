@@ -191,4 +191,8 @@ if RT_USING_TOUCH
         default y
 endif
 
+config RT_USING_SYSTICK
+    bool "Enable SYSTICK"
+    default n
+
 endmenu

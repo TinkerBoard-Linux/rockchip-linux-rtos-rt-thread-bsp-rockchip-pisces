@@ -39,6 +39,13 @@
 #include "drv_pm.h"
 #endif
 
+#ifdef RT_USING_SYSTICK
+#define TICK_IRQn  SysTick_IRQn
+#else
+#define TICK_TIMER TIMER4
+#define TICK_IRQn  TIMER4_IRQn
+#endif
+
 #ifdef RT_USING_CRU
 static const struct clk_init clk_inits[] =
 {
@@ -128,13 +135,16 @@ void print_clk_summary_info(void)
 }
 #endif
 
-static void systick_isr(int vector, void *param)
+static void tick_isr(int vector, void *param)
 {
     /* enter interrupt */
     rt_interrupt_enter();
 
-    HAL_SYSTICK_IRQHandler();
+    HAL_IncTick();
     rt_tick_increase();
+#ifdef TICK_TIMER
+    HAL_TIMER_ClrInt(TICK_TIMER);
+#endif
 
     /* leave interrupt */
     rt_interrupt_leave();
@@ -400,10 +410,19 @@ void rt_hw_board_init()
     /* HAL_Init */
     HAL_Init();
 
-    /* System tick init */
-    rt_hw_interrupt_install(SysTick_IRQn, systick_isr, RT_NULL, "tick");
+    /* tick init */
     HAL_SetTickFreq(1000 / RT_TICK_PER_SECOND);
-    HAL_SYSTICK_Init();
+    rt_hw_interrupt_install(TICK_IRQn, tick_isr, RT_NULL, "tick");
+    rt_hw_interrupt_umask(TICK_IRQn);
+#ifdef RT_USING_SYSTICK
+    HAL_SYSTICK_CLKSourceConfig(HAL_TICK_CLKSRC_EXT);
+    HAL_SYSTICK_Config((PLL_INPUT_OSC_RATE / RT_TICK_PER_SECOND) - 1);
+    HAL_SYSTICK_Enable();
+#else
+    HAL_TIMER_Init(TICK_TIMER, TIMER_FREE_RUNNING);
+    HAL_TIMER_SetCount(TICK_TIMER, (PLL_INPUT_OSC_RATE / RT_TICK_PER_SECOND) - 1);
+    HAL_TIMER_Start_IT(TICK_TIMER);
+#endif
 
     rt_hw_cpu_cache_init();
 
