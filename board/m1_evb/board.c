@@ -281,7 +281,8 @@ static struct regulator_desc regulators[] =
 
 const struct regulator_init regulator_inits[] =
 {
-    REGULATOR_INIT("vdd_dsp_core", PWR_ID_DSP_CORE, 800000, 800000, 1),
+    REGULATOR_INIT("vdd_dsp_core", PWR_ID_DSP_CORE, 800000, 1, 800000, 1),
+    REGULATOR_INIT("vcc_audio", PWR_ID_VCC_AUDIO, 0, 0, 0, 1),
     { /* sentinel */ },
 };
 #endif
