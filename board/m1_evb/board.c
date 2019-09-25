@@ -392,6 +392,10 @@ void rt_hw_board_init()
         CRU->CRU_CLKGATE_CON[2] = 0x088f088f;
 #endif
 
+#ifdef RT_USING_PMU
+    HAL_PD_Off(PD_AUDIO);
+#endif
+
     /* Initial usart deriver, and set console device */
 #ifdef RT_USING_UART
     rt_hw_usart_init();
