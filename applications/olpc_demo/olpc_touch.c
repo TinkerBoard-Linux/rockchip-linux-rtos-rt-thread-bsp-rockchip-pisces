@@ -230,7 +230,7 @@ rt_err_t iterate_touch_item_list(struct olpc_touch_item *header, struct point_in
                 {
                     if ((curtick - g_olpc_touch.tick) >= TOUCH_LONG_DOWN_PROB_TIME + TOUCH_LONG_PRESS_STEP_TIME)
                     {
-                        g_olpc_touch.tick -= TOUCH_LONG_PRESS_STEP_TIME - 1;
+                        g_olpc_touch.tick += TOUCH_LONG_PRESS_STEP_TIME;
                         image->touch_callback(image->touch_id, TOUCH_EVENT_LONG_PRESS, point, image->parameter);
                     }
                 }
