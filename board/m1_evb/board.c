@@ -326,6 +326,30 @@ const static struct dvfs_table dvfs_shrm_table[] =
     },
 };
 
+const static struct dvfs_table dvfs_dsp_table[] =
+{
+    {
+        .freq = 49500000,
+        .volt = 800000,
+    },
+    {
+        .freq = 99000000,
+        .volt = 800000,
+    },
+    {
+        .freq = 198000000,
+        .volt = 800000,
+    },
+    {
+        .freq = 297000000,
+        .volt = 800000,
+    },
+    {
+        .freq = 396000000,
+        .volt = 800000,
+    },
+};
+
 struct rk_dvfs_desc dvfs_data[] =
 {
     {
@@ -342,6 +366,13 @@ struct rk_dvfs_desc dvfs_data[] =
         .table = &dvfs_core_table[0],
         .tbl_cnt = HAL_ARRAY_SIZE(dvfs_core_table),
     },
+    {
+        .clk_id = ACLK_DSP,
+        .pwr_id = PWR_ID_CORE,
+        .tbl_idx = 0,
+        .table = &dvfs_dsp_table[0],
+        .tbl_cnt = HAL_ARRAY_SIZE(dvfs_dsp_table),
+    }
 };
 
 static struct pm_mode_dvfs pm_mode_data[] =
