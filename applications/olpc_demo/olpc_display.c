@@ -846,6 +846,9 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+    RT_ASSERT(ret == RT_EOK);
+
     /* post scale set */
     cfg = wincfg;
     if (1)
@@ -921,6 +924,35 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_COMMIT, NULL);
     RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_display_sync_hook(device);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    RT_ASSERT(ret == RT_EOK);
+
+    return ret;
+}
+
+/**
+ * backlight set.
+ */
+rt_err_t rt_display_win_backlight_set(rt_uint16_t val)
+{
+    rt_err_t ret = RT_EOK;
+    struct rt_display_data *disp_data = g_disp_data;
+    rt_device_t device = disp_data->device;
+    rt_uint16_t blval  = val;
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_UPDATE_BL, &blval);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    RT_ASSERT(ret == RT_EOK);
+
     return ret;
 }
 

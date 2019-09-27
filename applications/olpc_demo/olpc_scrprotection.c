@@ -31,7 +31,7 @@ static uint32_t bpp1_lut[2] =
 #define SCRPROTECTION_REGION_Y       0
 #define SCRPROTECTION_REGION_W       WIN_LAYERS_W
 #define SCRPROTECTION_REGION_H       WIN_LAYERS_H
-#define SCRPROTECTION_FB_W           ((WIN_LAYERS_W / 32) * 32)
+#define SCRPROTECTION_FB_W           (320 + 32)
 #define SCRPROTECTION_FB_H           240
 
 /* Event define */
@@ -44,7 +44,7 @@ static uint32_t bpp1_lut[2] =
 #define STATE_SCRPROTECTION_RUN      (0x01UL << 0)
 
 /* Command define */
-#define CMD_SCRPROTECTION_UPDATE     (0x01UL << 0)
+#define CMD_ANIMAL_UPDATE           (0x01UL << 0)
 
 #define SCRPROTECTION_REFRESH_TIME   (RT_TICK_PER_SECOND * 1)
 
@@ -136,7 +136,7 @@ static void olpc_srcprotect_timer_callback(void *parameter)
     }
     olpc_data->pic_x = olpc_data->picid * 96 + 44;
 
-    olpc_data->cmd |= CMD_SCRPROTECTION_UPDATE;
+    olpc_data->cmd |= CMD_ANIMAL_UPDATE;
     rt_event_send(olpc_data->disp_event, EVENT_SCRPROTECTION_REFRESH);
 }
 
@@ -172,20 +172,52 @@ static void olpc_srcprotect_srcclear(struct olpc_srcprotect_data *olpc_data)
     rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
     //refresh screen
-    {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
-    }
+    ret = rt_display_win_layers_set(&wincfg);
+    RT_ASSERT(ret == RT_EOK);
 }
+
+/**
+ * screen protection refresh process
+ */
+static rt_err_t olpc_srcprotect_animal_region_refresh(struct olpc_srcprotect_data *olpc_data,
+        struct rt_display_config *wincfg)
+{
+    rt_err_t ret;
+    rt_int32_t   xoffset, yoffset;
+    rt_device_t  device = olpc_data->disp->device;
+    image_info_t *img_info = NULL;
+    struct rt_device_graphic_info info;
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
+
+    wincfg->winId = SCRPROTECTION_GRAY1_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->x     = ((SCRPROTECTION_REGION_X + olpc_data->pic_x) / 32) * 32;
+    wincfg->y     = ((SCRPROTECTION_REGION_Y + olpc_data->pic_y) /  2) * 2;
+    wincfg->w     = ((SCRPROTECTION_FB_W + 31) / 32) * 32;
+    wincfg->h     = SCRPROTECTION_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h / 8;
+    wincfg->ylast = olpc_data->pic_ylast;
+    olpc_data->pic_ylast = wincfg->y;
+
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
+
+    rt_memset(wincfg->fb, 0, wincfg->fblen);
+    {
+        img_info = srcprotect_pic_num[olpc_data->picid];
+        xoffset = olpc_data->pic_x % 32;
+        yoffset = 0;
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
+    }
+
+    return RT_EOK;
+}
+
 
 /**
  * screen protection refresh process
@@ -193,57 +225,25 @@ static void olpc_srcprotect_srcclear(struct olpc_srcprotect_data *olpc_data)
 static rt_err_t olpc_srcprotect_task_fun(struct olpc_srcprotect_data *olpc_data)
 {
     rt_err_t ret;
-    rt_int32_t   xoffset, yoffset;
-    rt_device_t  device = olpc_data->disp->device;
-    image_info_t *img_info = NULL;
-    struct rt_device_graphic_info info;
-    struct rt_display_config wincfg, *wlist_head = RT_NULL;
-
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
+    struct rt_display_config  wincfg;
+    struct rt_display_config *winhead = RT_NULL;
 
     rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-    rt_display_win_layers_list(&wlist_head, &wincfg);
 
-    wincfg.winId = SCRPROTECTION_GRAY1_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.x     = SCRPROTECTION_REGION_X;
-    wincfg.y     = ((SCRPROTECTION_REGION_Y + olpc_data->pic_y) / 2) * 2;
-    wincfg.w     = ((SCRPROTECTION_FB_W + 31) / 32) * 32;
-    wincfg.h     = SCRPROTECTION_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.ylast = olpc_data->pic_ylast;
-    olpc_data->pic_ylast = wincfg.y;
-
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->fblen);
-
-    rt_memset(wincfg.fb, 0, wincfg.fblen);
-    if ((olpc_data->cmd & CMD_SCRPROTECTION_UPDATE) == CMD_SCRPROTECTION_UPDATE)
+    if ((olpc_data->cmd & CMD_ANIMAL_UPDATE) == CMD_ANIMAL_UPDATE)
     {
-        olpc_data->cmd &= ~CMD_SCRPROTECTION_UPDATE;
-
-        img_info = srcprotect_pic_num[olpc_data->picid];
-        xoffset = olpc_data->pic_x;
-        yoffset = 0;
-        RT_ASSERT(img_info->w <= wincfg.w);
-        RT_ASSERT(img_info->h <= wincfg.h);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        olpc_data->cmd &= ~CMD_ANIMAL_UPDATE;
+        olpc_srcprotect_animal_region_refresh(olpc_data, &wincfg);
     }
 
+    //refresh screen
+    rt_display_win_layers_list(&winhead, &wincfg);
+    ret = rt_display_win_layers_set(winhead);
+    RT_ASSERT(ret == RT_EOK);
+
+    if (olpc_data->cmd != 0)
     {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(wlist_head);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
+        rt_event_send(olpc_data->disp_event, EVENT_SCRPROTECTION_REFRESH);
     }
 
     return RT_EOK;
@@ -370,7 +370,7 @@ void olpc_srcprotect_app_start(rt_err_t (*hook)(void *parameter), void *paramete
     olpc_data->exithook      = hook;
     olpc_data->exithookparam = parameter;
 
-    olpc_data->cmd   = CMD_SCRPROTECTION_UPDATE;
+    olpc_data->cmd   = CMD_ANIMAL_UPDATE;
     rt_event_send(olpc_data->disp_event, EVENT_SCRPROTECTION_START | EVENT_SCRPROTECTION_REFRESH);
 }
 

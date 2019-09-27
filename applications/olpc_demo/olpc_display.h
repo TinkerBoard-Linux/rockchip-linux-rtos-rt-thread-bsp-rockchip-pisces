@@ -124,6 +124,11 @@ rt_err_t rt_display_screen_scroll(rt_device_t device, uint8_t winId, uint32_t mo
                                   int16_t xoffset, int16_t yoffset);
 
 /**
+ * backlight set.
+ */
+rt_err_t rt_display_win_backlight_set(rt_uint16_t val);
+
+/**
  * Clear screen for display initial.
  */
 int rt_display_screen_clear(rt_device_t device);

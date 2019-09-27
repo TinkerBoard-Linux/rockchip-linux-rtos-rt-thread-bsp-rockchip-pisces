@@ -136,20 +136,8 @@ static rt_err_t olpc_ebook_init(struct olpc_ebook_data *olpc_data)
 
     rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
-    //refresh screen
-    {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
-    }
+    ret = rt_display_win_layers_set(&wincfg);
+    RT_ASSERT(ret == RT_EOK);
 
     return RT_EOK;
 }
@@ -163,65 +151,72 @@ static void olpc_ebook_deinit(struct olpc_ebook_data *olpc_data)
 }
 
 /**
- * olpc ebook refresh process
+ * olpc ebook refresh page
  */
-static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
+static rt_err_t olpc_ebook_page_region_refresh(struct olpc_ebook_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int32_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
     struct rt_device_graphic_info info;
-    struct rt_display_config pagewin, *wlist_head = RT_NULL;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_memset(&pagewin, 0, sizeof(struct rt_display_config));
-    rt_display_win_layers_list(&wlist_head, &pagewin);
+    wincfg->winId = EBOOK_TEXT_GRAY1_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((EBOOK_FB_W + 31) / 32) * 32;
+    wincfg->h     = EBOOK_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h / 8;
+    wincfg->x     = EBOOK_REGION_X + (EBOOK_REGION_W - EBOOK_FB_W) / 2;
+    wincfg->y     = EBOOK_REGION_Y + (EBOOK_REGION_H - EBOOK_FB_H) / 2;
+    wincfg->ylast = wincfg->y;
 
-    pagewin.winId = EBOOK_TEXT_GRAY1_WIN;
-    pagewin.fb    = olpc_data->fb;
-    pagewin.w     = ((EBOOK_FB_W + 31) / 32) * 32;
-    pagewin.h     = EBOOK_FB_H;
-    pagewin.fblen = pagewin.w * pagewin.h / 8;
-    pagewin.x     = EBOOK_REGION_X + (EBOOK_REGION_W - EBOOK_FB_W) / 2;
-    pagewin.y     = EBOOK_REGION_Y + (EBOOK_REGION_H - EBOOK_FB_H) / 2;
-    pagewin.ylast = pagewin.y;
-
-    RT_ASSERT((pagewin.w % 4) == 0);
-    RT_ASSERT((pagewin.h % 2) == 0);
-    RT_ASSERT(pagewin.fblen <= olpc_data->fblen);
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
     /* Page update */
+    {
+        xoffset = 0;
+        yoffset = 0;
+        //draw pages
+        img_info = ebook_pages_num[olpc_data->page_num];
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
+    }
+
+    return RT_EOK;
+}
+
+/**
+ * olpc ebook refresh process
+ */
+static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
+{
+    rt_err_t ret;
+    struct rt_display_config  wincfg;
+    struct rt_display_config *winhead = RT_NULL;
+
+    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+
     if ((olpc_data->cmd & UPDATE_PAGE) == UPDATE_PAGE)
     {
         olpc_data->cmd &= ~UPDATE_PAGE;
-
-        rt_memset((void *)pagewin.fb, 0x00, pagewin.fblen);
-
-        xoffset = 0;
-        yoffset = 0;
-
-        //draw pages
-        img_info = ebook_pages_num[olpc_data->page_num];
-        RT_ASSERT(img_info->w <= pagewin.w);
-        RT_ASSERT(img_info->h <= pagewin.h);
-        rt_display_img_fill(img_info, pagewin.fb, pagewin.w, xoffset + img_info->x, yoffset + img_info->y);
+        olpc_ebook_page_region_refresh(olpc_data, &wincfg);
     }
 
+    //refresh screen
+    rt_display_win_layers_list(&winhead, &wincfg);
+    ret = rt_display_win_layers_set(winhead);
+    RT_ASSERT(ret == RT_EOK);
+
+    if (olpc_data->cmd != 0)
     {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(wlist_head);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
+        rt_event_send(olpc_data->disp_event, EVENT_EBOOK_REFRESH);
     }
 
     return RT_EOK;
@@ -312,18 +307,8 @@ static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_
                 {
                     olpc_data->disp->blval = rt_display_get_bl_max(olpc_data->disp->device);
                 }
-                //rt_kprintf("backlight val = %d\n", olpc_data->disp->blval);
 
-                {
-                    ret = rt_device_control(olpc_data->disp->device, RTGRAPHIC_CTRL_POWERON, NULL);
-                    RT_ASSERT(ret == RT_EOK);
-
-                    ret = rt_device_control(olpc_data->disp->device, RK_DISPLAY_CTRL_UPDATE_BL, &olpc_data->disp->blval);
-                    RT_ASSERT(ret == RT_EOK);
-
-                    ret = rt_device_control(olpc_data->disp->device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-                    RT_ASSERT(ret == RT_EOK);
-                }
+                rt_display_win_backlight_set(olpc_data->disp->blval);
             }
 
             ret = RT_EOK;

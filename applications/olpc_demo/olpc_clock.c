@@ -98,9 +98,8 @@ static uint32_t bpp1_lut[2] =
 
 #define COLOR_DEPTH         8
 
-#define DISP_UPDATE_TIME    (RT_TICK_PER_SECOND / 20)   // 50ms
-#define HOME_HOLD_TIME      (RT_TICK_PER_SECOND * 5)
-#define FP_HOLD_TIME        (RT_TICK_PER_SECOND * 5)
+#define CLOCK_UPDATE_TIME   (RT_TICK_PER_SECOND)
+#define SCREEN_HOLD_TIME    (RT_TICK_PER_SECOND * 5)
 #define FP_LOOP_TIME        (RT_TICK_PER_SECOND / 10)
 
 /*
@@ -181,8 +180,10 @@ struct olpc_clock_data
 
     rt_uint8_t *fb;
     rt_uint32_t fblen;
+
     rt_timer_t  clock_timer;
-    void       *clock_timer_parameter;
+    rt_timer_t  src_timer;
+    rt_timer_t  fp_timer;
 
     rt_event_t  disp_event;
     rt_uint32_t cmd;
@@ -217,14 +218,12 @@ struct olpc_clock_data
     rt_int16_t  msg_ylast;
 
     rt_uint8_t  fp_id;
-    rt_uint32_t fp_lpcnt;
     rt_uint8_t  home_id;
 
     rt_int16_t  lock_px;
     rt_int16_t  lock_py;
 
     rt_uint8_t  screen_sta;
-    rt_uint32_t screen_timeout;
 };
 
 /* 0 ~ 9 */
@@ -322,109 +321,91 @@ static image_info_t *fingerprint_item[7] =
  **************************************************************************************************
  */
 /**
- * Display clock demo timer callback.
+ * Clock timer callback.
  */
 static void olpc_clock_timeout(void *parameter)
 {
     struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
 
-    olpc_data->ticks += DISP_UPDATE_TIME;
-    if ((olpc_data->ticks % DISP_UPDATE_TIME) != 0)
+    ++olpc_data->second;
+    if (olpc_data->second >= 60)
     {
-        olpc_data->ticks = (olpc_data->ticks / DISP_UPDATE_TIME) * DISP_UPDATE_TIME;
-    }
-
-    //clock update every 1000ms
-    if ((olpc_data->ticks % 1000) == 0)
-    {
-        ++olpc_data->second;
-
-        if (olpc_data->second >= 60)
+        olpc_data->second = 0;
+        if (++olpc_data->minute == 60)
         {
-            olpc_data->second = 0;
-            if (++olpc_data->minute == 60)
+            olpc_data->minute = 0;
+            if (++olpc_data->hour >= 24)
             {
-                olpc_data->minute = 0;
-                if (++olpc_data->hour >= 24)
+                olpc_data->hour = 0;
+
+                if (++olpc_data->week == 7)
                 {
-                    olpc_data->hour = 0;
-
-                    if (++olpc_data->week == 7)
-                    {
-                        olpc_data->week = 0;
-                    }
-
-                    if (++olpc_data->day > 31)
-                    {
-                        olpc_data->day = 1;
-                        if (++olpc_data->month > 12)
-                        {
-                            olpc_data->month = 1;
-                        }
-                    }
-                    olpc_data->cmd |= UPDATE_MSG;
-                    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+                    olpc_data->week = 0;
                 }
+
+                if (++olpc_data->day > 31)
+                {
+                    olpc_data->day = 1;
+                    if (++olpc_data->month > 12)
+                    {
+                        olpc_data->month = 1;
+                    }
+                }
+                olpc_data->cmd |= UPDATE_MSG;
             }
         }
-
-        olpc_data->cmd |= UPDATE_CLOCK;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-    }
-
-    // clock region move update every 3 min
-    if ((olpc_data->ticks % (1000 * 60 * 3)) == 0)
-    {
-        olpc_data->cmd |= UPDATE_CLOCK | MOVE_CLOCK;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-    }
-
-    // msg region move update every 3 min
-    if ((olpc_data->ticks % (1000 * 60 * 3)) == 0)
-    {
-        olpc_data->cmd |= UPDATE_MSG | MOVE_MSG;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-    }
-
-#if defined(RT_USING_TOUCH)
-    // home on state time out check, timeout = HOME_HOLD_TIME ms
-    if (olpc_data->screen_sta != SCREEN_OFF)
-    {
-        olpc_data->screen_timeout -= DISP_UPDATE_TIME;
-        if (olpc_data->screen_timeout == 0)
+        if ((olpc_data->minute % 3) == 0)
         {
-            if (olpc_data->screen_sta == SCREEN_HOME)
-            {
-                olpc_clock_home_touch_unregister(olpc_data);
-                olpc_clock_fingerprint_touch_unregister(olpc_data);
-
-                olpc_data->cmd |= UPDATE_HOME | UPDATE_FINGERP;
-                rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-            }
-            else if (olpc_data->screen_sta == SCREEN_LOCK)
-            {
-                olpc_clock_lock_touch_unregister(olpc_data);
-
-                olpc_data->cmd |= UPDATE_LOCK;
-                rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-            }
-            olpc_data->screen_sta = SCREEN_OFF;
-        }
-
-        // fingerprint loop change every FP_LOOP_TIME ms
-        if (olpc_data->fp_lpcnt > 0)
-        {
-            if ((olpc_data->ticks % FP_LOOP_TIME) == 0)
-            {
-                olpc_data->fp_lpcnt--;
-                olpc_data->fp_id++;
-                olpc_data->cmd |= UPDATE_FINGERP;
-                rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-            }
+            olpc_data->cmd |= MOVE_CLOCK | UPDATE_CLOCK;
+            olpc_data->cmd |= MOVE_MSG | UPDATE_MSG;
         }
     }
-#endif
+
+    olpc_data->cmd |= UPDATE_CLOCK;
+    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+}
+
+/**
+ * Screen timeout timer callback.
+ */
+static void olpc_screen_timeout(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    if (olpc_data->screen_sta == SCREEN_HOME)
+    {
+        olpc_clock_home_touch_unregister(olpc_data);
+        olpc_clock_fingerprint_touch_unregister(olpc_data);
+
+        olpc_data->cmd |= UPDATE_HOME | UPDATE_FINGERP;
+        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+    }
+    else if (olpc_data->screen_sta == SCREEN_LOCK)
+    {
+        olpc_clock_lock_touch_unregister(olpc_data);
+
+        olpc_data->cmd |= UPDATE_LOCK;
+        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+    }
+
+    olpc_data->screen_sta = SCREEN_OFF;
+}
+
+/**
+ * Fingerprint refresh timer callback.
+ */
+static void olpc_fp_timeout(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    olpc_data->fp_id++;
+    olpc_data->cmd |= UPDATE_FINGERP;
+    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+
+    if (olpc_data->fp_id >= 6)
+    {
+        rt_timer_stop(olpc_data->fp_timer);
+    }
 }
 
 /**
@@ -433,9 +414,6 @@ static void olpc_clock_timeout(void *parameter)
 static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 {
     rt_err_t    ret;
-    rt_uint8_t  *fb;
-    rt_uint32_t fb_len;
-    rt_timer_t  timer;
     rt_device_t device = olpc_data->disp->device;
     struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
@@ -468,27 +446,21 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
     olpc_data->msg_ylast = MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2;
 
     olpc_data->home_id = 0;
-
     olpc_data->fp_id = 0;
-    olpc_data->fp_lpcnt = 0;
-
     olpc_data->screen_sta = SCREEN_OFF;
-    olpc_data->screen_timeout = 0;
-
-
     olpc_data->cmd = UPDATE_CLOCK | UPDATE_MSG;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    fb_len  = DISP_WIN_W * DISP_WIN_H * COLOR_DEPTH / 8;
-    fb   = (rt_uint8_t *)rt_malloc_large(fb_len);
-    RT_ASSERT(fb != RT_NULL);
+    olpc_data->fblen = DISP_WIN_W * DISP_WIN_H * COLOR_DEPTH / 8;
+    olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
+    RT_ASSERT(olpc_data->fb != RT_NULL);
 
     rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
 
     wincfg.winId = CLOCK_RGB332_WIN;
-    wincfg.fb    = fb;
+    wincfg.fb    = olpc_data->fb;
     wincfg.x     = 0;
     wincfg.y     = 0;
     wincfg.w     = 4;
@@ -497,7 +469,7 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 
     RT_ASSERT((wincfg.w % 4) == 0);
     RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT((wincfg.fblen) <= fb_len);
+    RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
 
     rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
@@ -505,20 +477,30 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
     ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);
 
-    timer = rt_timer_create("olpc_clock_timer",
-                            olpc_clock_timeout,
-                            (void *)olpc_data,
-                            DISP_UPDATE_TIME,
-                            RT_TIMER_FLAG_PERIODIC);
-    RT_ASSERT(timer != RT_NULL);
+    // create sreen touch timer
+    olpc_data->src_timer = rt_timer_create("srctimer",
+                                           olpc_screen_timeout,
+                                           (void *)olpc_data,
+                                           SCREEN_HOLD_TIME,
+                                           RT_TIMER_FLAG_ONE_SHOT);
+    RT_ASSERT(olpc_data->src_timer != RT_NULL);
 
-    rt_timer_start(timer);
+    // create fp touch timer
+    olpc_data->fp_timer = rt_timer_create("fptimer",
+                                          olpc_fp_timeout,
+                                          (void *)olpc_data,
+                                          FP_LOOP_TIME,
+                                          RT_TIMER_FLAG_PERIODIC);
+    RT_ASSERT(olpc_data->fp_timer != RT_NULL);
 
-    olpc_data->fb  = fb;
-    olpc_data->fblen = fb_len;
-
-    olpc_data->clock_timer = timer;
-    olpc_data->clock_timer_parameter = (void *)olpc_data;
+    // create clock timer
+    olpc_data->clock_timer = rt_timer_create("clocktimer",
+                             olpc_clock_timeout,
+                             (void *)olpc_data,
+                             CLOCK_UPDATE_TIME,
+                             RT_TIMER_FLAG_PERIODIC);
+    RT_ASSERT(olpc_data->clock_timer != RT_NULL);
+    rt_timer_start(olpc_data->clock_timer);
 
     return RT_EOK;
 }
@@ -529,6 +511,14 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 static void olpc_clock_deinit(struct olpc_clock_data *olpc_data)
 {
     rt_err_t ret;
+
+    rt_timer_stop(olpc_data->fp_timer);
+    ret = rt_timer_delete(olpc_data->fp_timer);
+    RT_ASSERT(ret == RT_EOK);
+
+    rt_timer_stop(olpc_data->src_timer);
+    ret = rt_timer_delete(olpc_data->src_timer);
+    RT_ASSERT(ret == RT_EOK);
 
     ret = rt_timer_stop(olpc_data->clock_timer);
     RT_ASSERT(ret == RT_EOK);
@@ -577,71 +567,66 @@ static rt_err_t olpc_clock_clock_region_move(struct olpc_clock_data *olpc_data)
 /**
  * Clock region refresh.
  */
-static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_data)
+static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-
     RT_ASSERT(ret == RT_EOK);
 
-    rt_display_sync_hook(device);
-
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-    wincfg.winId = CLOCK_RGB565_WIN;
+    wincfg->winId = CLOCK_RGB565_WIN;
 #else
-    wincfg.winId = CLOCK_RGB332_WIN;
+    wincfg->winId = CLOCK_RGB332_WIN;
 #endif
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = ((CLOCK_FB_W + 3) / 4) * 4;
-    wincfg.h     = CLOCK_FB_H;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((CLOCK_FB_W + 3) / 4) * 4;
+    wincfg->h     = CLOCK_FB_H;
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-    wincfg.fblen = wincfg.w * wincfg.h * 2;
+    wincfg->fblen = wincfg->w * wincfg->h * 2;
 #else
-    wincfg.fblen = wincfg.w * wincfg.h;
+    wincfg->fblen = wincfg->w * wincfg->h;
 #endif
-    wincfg.x     = CLOCK_REGION_X + (CLOCK_REGION_W - CLOCK_FB_W) / 2 + olpc_data->clock_xoffset;
-    wincfg.y     = CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2 + olpc_data->clock_yoffset;
-    wincfg.ylast = olpc_data->clock_ylast;
-    olpc_data->clock_ylast = wincfg.y;
+    wincfg->x     = CLOCK_REGION_X + (CLOCK_REGION_W - CLOCK_FB_W) / 2 + olpc_data->clock_xoffset;
+    wincfg->y     = CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2 + olpc_data->clock_yoffset;
+    wincfg->ylast = olpc_data->clock_ylast;
+    olpc_data->clock_ylast = wincfg->y;
 
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->fblen);
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 
     xoffset = 0;
     yoffset = 0;
 
     //draw background
     img_info = &clock_bkg_info;
-    RT_ASSERT(img_info->w <= wincfg.w);
-    RT_ASSERT(img_info->h <= wincfg.h);
+    RT_ASSERT(img_info->w <= wincfg->w);
+    RT_ASSERT(img_info->h <= wincfg->h);
 
     yoffset  += 0;
     xoffset  += (CLOCK_FB_W - img_info->w) / 2;
-    rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+    rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
     // draw hour,min,sec
     {
         int32_t hour, angle;
-        uint32_t background_w = wincfg.w;//img_info->w;
+        uint32_t background_w = wincfg->w;//img_info->w;
 
         xoffset += (img_info->w / 2);
         yoffset += (img_info->h / 2);
 
         //draw hour line
         img_info = &clock_hour_info;
-        RT_ASSERT(img_info->w <= wincfg.w / 2);
-        RT_ASSERT(img_info->h <= wincfg.h / 2);
+        RT_ASSERT(img_info->w <= wincfg->w / 2);
+        RT_ASSERT(img_info->h <= wincfg->h / 2);
 
         hour = olpc_data->hour;
         if (hour >= 12)
@@ -655,21 +640,21 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
         }
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
         rt_display_rotate_16bit((float)angle, img_info->w, img_info->h, (unsigned short *)img_info->data,
-                                (unsigned short *)((uint32_t)wincfg.fb + 2 * (yoffset * wincfg.w + xoffset)),
+                                (unsigned short *)((uint32_t)wincfg->fb + 2 * (yoffset * wincfg->w + xoffset)),
                                 background_w, 4, img_info->h / 2);
 #elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
         rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
-                               (unsigned char *)((uint32_t)wincfg.fb + (yoffset * wincfg.w + xoffset)),
+                               (unsigned char *)((uint32_t)wincfg->fb + (yoffset * wincfg->w + xoffset)),
                                background_w, 4, img_info->h / 2);
 #else
         rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
-                               (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset),
+                               (unsigned char *)((uint32_t)wincfg->fb + yoffset * wincfg->w + xoffset),
                                background_w, 16, img_info->h / 2);
 #endif
         //draw min line
         img_info = &clock_min_info;
-        RT_ASSERT(img_info->w <= wincfg.w / 2);
-        RT_ASSERT(img_info->h <= wincfg.h / 2);
+        RT_ASSERT(img_info->w <= wincfg->w / 2);
+        RT_ASSERT(img_info->h <= wincfg->h / 2);
 
         angle = olpc_data->minute * (360 / 60);
         angle -= 90;
@@ -679,21 +664,21 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
         }
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
         rt_display_rotate_16bit((float)angle, img_info->w, img_info->h, (unsigned short *)img_info->data,
-                                (unsigned short *)((uint32_t)wincfg.fb + 2 * (yoffset * wincfg.w + xoffset)),
+                                (unsigned short *)((uint32_t)wincfg->fb + 2 * (yoffset * wincfg->w + xoffset)),
                                 background_w, 4, img_info->h / 2);
 #elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
         rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
-                               (unsigned char *)((uint32_t)wincfg.fb + (yoffset * wincfg.w + xoffset)),
+                               (unsigned char *)((uint32_t)wincfg->fb + (yoffset * wincfg->w + xoffset)),
                                background_w, 4, img_info->h / 2);
 #else
         rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
-                               (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset),
+                               (unsigned char *)((uint32_t)wincfg->fb + yoffset * wincfg->w + xoffset),
                                background_w, 18, img_info->h / 2);
 #endif
         //draw second line
         img_info = &clock_sec_info;
-        RT_ASSERT(img_info->w <= wincfg.w / 2);
-        RT_ASSERT(img_info->h <= wincfg.h / 2);
+        RT_ASSERT(img_info->w <= wincfg->w / 2);
+        RT_ASSERT(img_info->h <= wincfg->h / 2);
 
         angle = olpc_data->second * (360 / 60);
         angle -= 90;
@@ -703,33 +688,29 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
         }
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
         rt_display_rotate_16bit((float)angle, img_info->w, img_info->h, (unsigned short *)img_info->data,
-                                (unsigned short *)((uint32_t)wincfg.fb + 2 * (yoffset * wincfg.w + xoffset)),
+                                (unsigned short *)((uint32_t)wincfg->fb + 2 * (yoffset * wincfg->w + xoffset)),
                                 background_w, 4, img_info->h / 2);
 #elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
         rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
-                               (unsigned char *)((uint32_t)wincfg.fb + (yoffset * wincfg.w + xoffset)),
+                               (unsigned char *)((uint32_t)wincfg->fb + (yoffset * wincfg->w + xoffset)),
                                background_w, 4, img_info->h / 2);
 #else
         rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
-                               (unsigned char *)((uint32_t)wincfg.fb + yoffset * wincfg.w + xoffset),
+                               (unsigned char *)((uint32_t)wincfg->fb + yoffset * wincfg->w + xoffset),
                                background_w, 20, img_info->h / 2);
 #endif
 
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
         //draw centre
         img_info = &clock_centre_info;
-        RT_ASSERT(img_info->w <= wincfg.w);
-        RT_ASSERT(img_info->h <= wincfg.h);
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
 
         yoffset  -= img_info->h / 2;
         xoffset  -= img_info->w / 2;
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 #endif
     }
-
-    //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
 
     return RT_EOK;
 }
@@ -771,37 +752,33 @@ static rt_err_t olpc_clock_msg_region_move(struct olpc_clock_data *olpc_data)
 /**
  * Clock region refresh.
  */
-static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
+static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_display_sync_hook(device);
+    wincfg->winId = CLOCK_RGB332_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((MSG_FB_W + 3) / 4) * 4;
+    wincfg->h     = MSG_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h;
+    wincfg->x     = MSG_REGION_X + (MSG_REGION_W - MSG_FB_W) / 2 + olpc_data->msg_xoffset;
+    wincfg->y     = MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2 + olpc_data->msg_yoffset;
+    wincfg->ylast = olpc_data->msg_ylast;
+    olpc_data->msg_ylast = wincfg->y;
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
-    wincfg.winId = CLOCK_RGB332_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = ((MSG_FB_W + 3) / 4) * 4;
-    wincfg.h     = MSG_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h;
-    wincfg.x     = MSG_REGION_X + (MSG_REGION_W - MSG_FB_W) / 2 + olpc_data->msg_xoffset;
-    wincfg.y     = MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2 + olpc_data->msg_yoffset;
-    wincfg.ylast = olpc_data->msg_ylast;
-    olpc_data->msg_ylast = wincfg.y;
-
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->fblen);
-
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 
     xoffset = 0;
     yoffset = 0;
@@ -818,46 +795,46 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if ((olpc_data->month / 10) != 0)
         {
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
         }
         xoffset  = xoffset + img_info->w + 0;
         img_info = msg_font_num[olpc_data->month % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* month */
         xoffset  = xoffset + img_info->w + 0;
         img_info = &msg_font_CHN_month_info;
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* day num */
         xoffset  = xoffset + img_info->w + 0;
         img_info = msg_font_num[(olpc_data->day / 10) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         xoffset  = xoffset + img_info->w + 0;
         img_info = msg_font_num[olpc_data->day % 10];
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* day */
         xoffset  = xoffset + img_info->w + 0;
         img_info = &msg_font_CHN_day_info;
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* week */
         xoffset  = xoffset + img_info->w + 30;
         img_info = &msg_font_CN_week_info;
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* week num */
         xoffset  = xoffset + img_info->w + 0;
         img_info = msg_week_num[olpc_data->week % 7];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
     }
 
     /* draw battery & motion */
@@ -867,7 +844,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         xoffset = xoffset_bak + 48;
         img_info = msg_bat_num[olpc_data->batval / 20];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 8);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 8);
 
         /* battary num */
         xoffset += img_info->w + 0;
@@ -875,7 +852,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if ((olpc_data->batval / 100) != 0)
         {
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
         }
 
         xoffset += img_info->w + 0;
@@ -883,24 +860,24 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if ((olpc_data->batval / 10) != 0)
         {
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
         }
 
         xoffset += img_info->w + 0;
         img_info = msg_font_num[olpc_data->batval % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
 
         xoffset += img_info->w;
         img_info = &msg_font_percent_info;
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
 
         /* motion */
         xoffset += img_info->w + 30;
         img_info = &msg_mov3_info;
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 0);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 0);
 
         /* motion num */
         uint8_t flag = 0;
@@ -910,7 +887,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         if (((olpc_data->moval / 100000) % 10) != 0)
         {
             flag = 1;
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
         img_info = msg_font_num[(olpc_data->moval / 10000) % 10];
@@ -918,7 +895,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         if (((olpc_data->moval / 10000) != 0) || (flag == 1))
         {
             flag = 1;
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
         img_info = msg_font_num[(olpc_data->moval / 1000) % 10];
@@ -926,7 +903,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         if (((olpc_data->moval / 1000) != 0) || (flag == 1))
         {
             flag = 1;
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
         img_info = msg_font_num[(olpc_data->moval / 100) % 10];
@@ -934,19 +911,19 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         if (((olpc_data->moval / 100) != 0) || (flag == 1))
         {
             flag = 1;
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
         img_info = msg_font_num[(olpc_data->moval / 10) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if (((olpc_data->moval / 10) != 0) || (flag == 1))
         {
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
         img_info = msg_font_num[olpc_data->moval % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset + 3);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
     }
 
     /* draw message: music & web & qq & wx */
@@ -956,30 +933,26 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
         xoffset = xoffset_bak + 106;
         img_info = msg_music_num[olpc_data->musicval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* qq */
         xoffset += img_info->w + 20;
         img_info = msg_qq_num[olpc_data->qqval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* web */
         xoffset += img_info->w + 20;
         img_info = msg_web_num[olpc_data->webval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* wx */
         xoffset += img_info->w + 20;
         img_info = msg_wx_num[olpc_data->wexval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
     }
-
-    //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
 
     return RT_EOK;
 }
@@ -987,36 +960,32 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data)
 /**
  * Clock region refresh.
  */
-static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data)
+static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_display_sync_hook(device);
+    wincfg->winId = CLOCK_GRAY1_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((HOME_FB_W + 31) / 32) * 32;
+    wincfg->h     = HOME_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h / 8;
+    wincfg->x     = HOME_REGION_X + (HOME_REGION_W - HOME_FB_W) / 2;
+    wincfg->y     = HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2;
+    wincfg->ylast = wincfg->y;
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
-    wincfg.winId = CLOCK_GRAY1_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = ((HOME_FB_W + 31) / 32) * 32;
-    wincfg.h     = HOME_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.x     = HOME_REGION_X + (HOME_REGION_W - HOME_FB_W) / 2;
-    wincfg.y     = HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2;
-    wincfg.ylast = wincfg.y;
-
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->fblen);
-
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 
     xoffset = 0;
     yoffset = 0;
@@ -1024,32 +993,28 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
     {
         /* home background */
         img_info = &home_backgroung_info;
-        RT_ASSERT(img_info->w <= wincfg.w);
-        RT_ASSERT(img_info->h <= wincfg.h);
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
 
         yoffset  += 0;
         xoffset  += (HOME_FB_W - img_info->w) / 2;
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* home arrow */
         img_info = &home_arrow1_info;
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
 
         /* home lock */
         img_info = &home_lock1_info;
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
 
         /* home ebook */
         img_info = home_item[olpc_data->home_id];
         if (img_info != NULL)
         {
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
         }
     }
-
-    //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
 
     return RT_EOK;
 }
@@ -1057,36 +1022,32 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
 /**
  * Clock region refresh.
  */
-static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *olpc_data)
+static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_display_sync_hook(device);
+    wincfg->winId = CLOCK_RGB332_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((FP_FB_W + 3) / 4) * 4;
+    wincfg->h     = FP_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h;
+    wincfg->x     = FP_REGION_X + (FP_REGION_W - FP_FB_W) / 2;
+    wincfg->y     = FP_REGION_Y + (FP_REGION_H - FP_FB_H) / 2;
+    wincfg->ylast = wincfg->y;
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
-    wincfg.winId = CLOCK_RGB332_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = ((FP_FB_W + 3) / 4) * 4;
-    wincfg.h     = FP_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h;
-    wincfg.x     = FP_REGION_X + (FP_REGION_W - FP_FB_W) / 2;
-    wincfg.y     = FP_REGION_Y + (FP_REGION_H - FP_FB_H) / 2;
-    wincfg.ylast = wincfg.y;
-
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->fblen);
-
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 
     xoffset = 0;
     yoffset = 0;
@@ -1095,113 +1056,88 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     {
         // draw fingerprint img
         img_info = fingerprint_item[olpc_data->fp_id];
-        RT_ASSERT(img_info->w <= wincfg.w);
-        RT_ASSERT(img_info->h <= wincfg.h);
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
 
         yoffset  += 0;
         xoffset  += (FP_FB_W - img_info->w) / 2;
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
     }
 
-    //refresh screen
-    {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
-    }
     return RT_EOK;
 }
 
 /**
  * Clock region refresh.
  */
-static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data)
+static rt_uint8_t unlock_flag = 0;
+static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_display_sync_hook(device);
+    wincfg->winId = CLOCK_GRAY1_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((LOCK_FB_W + 31) / 32) * 32;
+    wincfg->h     = LOCK_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h / 8;
+    wincfg->x     = LOCK_REGION_X + (LOCK_REGION_W - LOCK_FB_W) / 2;
+    wincfg->y     = LOCK_REGION_Y + (LOCK_REGION_H - LOCK_FB_H) / 2;
+    wincfg->ylast = wincfg->y;
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
-    wincfg.winId = CLOCK_GRAY1_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = ((LOCK_FB_W + 31) / 32) * 32;
-    wincfg.h     = LOCK_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.x     = LOCK_REGION_X + (LOCK_REGION_W - LOCK_FB_W) / 2;
-    wincfg.y     = LOCK_REGION_Y + (LOCK_REGION_H - LOCK_FB_H) / 2;
-    wincfg.ylast = wincfg.y;
-
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->fblen);
-
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 
     xoffset = 0;
     yoffset = 0;
 
     if (olpc_data->screen_sta == SCREEN_LOCK)
     {
-        /* lock bar */
-        img_info = &lock_bar_info;
-        RT_ASSERT(img_info->w <= wincfg.w);
-        RT_ASSERT(img_info->h <= wincfg.h);
-
-        yoffset  += 0;
-        xoffset  += (wincfg.w - img_info->w) / 2;
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset, yoffset);
-
-        /* lock block */
-        rt_uint8_t unlock_flag = 0;
-        img_info = &lock_block_info;
-        rt_int16_t xoff = (olpc_data->lock_px - (wincfg.x + xoffset + img_info->x));
-        if (xoff < 0)
+        if (unlock_flag == 0)
         {
-            xoff = 0;
+            /* lock bar */
+            img_info = &lock_bar_info;
+            RT_ASSERT(img_info->w <= wincfg->w);
+            RT_ASSERT(img_info->h <= wincfg->h);
+
+            yoffset  += 0;
+            xoffset  += (wincfg->w - img_info->w) / 2;
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
+
+            /* lock block */
+            img_info = &lock_block_info;
+            rt_int16_t xoff = (olpc_data->lock_px - (wincfg->x + xoffset + img_info->x));
+            if (xoff < 0)
+            {
+                xoff = 0;
+            }
+            if (xoff > (wincfg->w - img_info->w - img_info->x - 8))
+            {
+                xoff = wincfg->w - img_info->w - img_info->x - 8;
+                unlock_flag = 1;
+            }
+            xoffset += xoff;
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
         }
-        if (xoff > (wincfg.w - img_info->w - img_info->x - 8))
+        else
         {
-            xoff = wincfg.w - img_info->w - img_info->x - 8;
-            unlock_flag = 1;
-        }
-        xoffset += xoff;
-
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
-
-        if (unlock_flag == 1)
-        {
-            //unlock
-            ret = rt_display_win_layers_set(&wincfg);
-            RT_ASSERT(ret == RT_EOK);
-
-            rt_display_sync_hook(device);
-
-            rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
-
+            unlock_flag = 0;
+            rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 #if defined(RT_USING_TOUCH)
             olpc_clock_lock_touch_unregister(olpc_data);
-
             olpc_clock_home_touch_register(olpc_data);
             olpc_clock_fingerprint_touch_register(olpc_data);
 #endif
-
             olpc_data->home_id  = 8;
             olpc_data->fp_id    = 0;
             olpc_data->screen_sta = SCREEN_HOME;
@@ -1209,10 +1145,6 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
             rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
         }
     }
-
-    //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
 
     return RT_EOK;
 }
@@ -1223,11 +1155,13 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
 static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
 {
     rt_err_t ret;
-    rt_device_t  device = olpc_data->disp->device;
+    struct rt_display_config  wincfg;
+    struct rt_display_config *winhead = RT_NULL;
+
+    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
 
     //rt_tick_t ticks = rt_tick_get();
 
-    //rt_kprintf("cmd = 0x%2x\n", olpc_data->cmd);
     if ((olpc_data->cmd & MOVE_CLOCK) == MOVE_CLOCK)
     {
         olpc_data->cmd &= ~MOVE_CLOCK;
@@ -1241,49 +1175,45 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
         olpc_clock_msg_region_move(olpc_data);
     }
 
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-    RT_ASSERT(ret == RT_EOK);
-
     if ((olpc_data->cmd & UPDATE_CLOCK) == UPDATE_CLOCK)
     {
         olpc_data->cmd &= ~UPDATE_CLOCK;
 
-        ret = olpc_clock_clock_region_refresh(olpc_data);
+        ret = olpc_clock_clock_region_refresh(olpc_data, &wincfg);
         RT_ASSERT(ret == RT_EOK);
     }
-    /* else */if ((olpc_data->cmd & UPDATE_MSG) == UPDATE_MSG)
+    else if ((olpc_data->cmd & UPDATE_MSG) == UPDATE_MSG)
     {
         olpc_data->cmd &= ~UPDATE_MSG;
 
-        ret = olpc_clock_msg_region_refresh(olpc_data);
+        ret = olpc_clock_msg_region_refresh(olpc_data, &wincfg);
         RT_ASSERT(ret == RT_EOK);
     }
-    /* else */if ((olpc_data->cmd & UPDATE_HOME) == UPDATE_HOME)
+    else if ((olpc_data->cmd & UPDATE_HOME) == UPDATE_HOME)
     {
         olpc_data->cmd &= ~UPDATE_HOME;
 
-        ret = olpc_clock_home_region_refresh(olpc_data);
+        ret = olpc_clock_home_region_refresh(olpc_data, &wincfg);
         RT_ASSERT(ret == RT_EOK);
     }
-    /* else */if ((olpc_data->cmd & UPDATE_FINGERP) == UPDATE_FINGERP)
+    else if ((olpc_data->cmd & UPDATE_FINGERP) == UPDATE_FINGERP)
     {
         olpc_data->cmd &= ~UPDATE_FINGERP;
 
-        ret = olpc_clock_fingerprint_region_refresh(olpc_data);
+        ret = olpc_clock_fingerprint_region_refresh(olpc_data, &wincfg);
         RT_ASSERT(ret == RT_EOK);
     }
-    /* else */if ((olpc_data->cmd & UPDATE_LOCK) == UPDATE_LOCK)
+    else if ((olpc_data->cmd & UPDATE_LOCK) == UPDATE_LOCK)
     {
         olpc_data->cmd &= ~UPDATE_LOCK;
 
-        ret = olpc_clock_lock_region_refresh(olpc_data);
+        ret = olpc_clock_lock_region_refresh(olpc_data, &wincfg);
         RT_ASSERT(ret == RT_EOK);
     }
 
-    ret = rt_display_sync_hook(device);
-    RT_ASSERT(ret == RT_EOK);
-
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    //refresh screen
+    rt_display_win_layers_list(&winhead, &wincfg);
+    ret = rt_display_win_layers_set(winhead);
     RT_ASSERT(ret == RT_EOK);
 
     if (olpc_data->cmd != 0)
@@ -1324,9 +1254,10 @@ static rt_err_t olpc_clock_screen_touch_callback(rt_int32_t touch_id, enum olpc_
             image_info_t *img = &lock_block_info;
             olpc_data->lock_px = img->x_scr;
             olpc_data->lock_py = img->y_scr;
-
             olpc_data->cmd |= UPDATE_LOCK;
             rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+
+
             ret = RT_EOK;
         }
         break;
@@ -1335,7 +1266,7 @@ static rt_err_t olpc_clock_screen_touch_callback(rt_int32_t touch_id, enum olpc_
         break;
     }
 
-    olpc_data->screen_timeout = HOME_HOLD_TIME;   //reset screen on timer
+    rt_timer_start(olpc_data->src_timer);   // start & restart timer
 
     return ret;
 }
@@ -1442,9 +1373,10 @@ static rt_err_t olpc_clock_fingerprint_touch_callback(rt_int32_t touch_id, enum 
     {
     case TOUCH_EVENT_SHORT_DOWN:
         olpc_data->fp_id  = 0;
-        olpc_data->fp_lpcnt = 6;
         olpc_data->cmd |= UPDATE_FINGERP;
         rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+
+        rt_timer_start(olpc_data->fp_timer);
         ret = RT_EOK;
         break;
 

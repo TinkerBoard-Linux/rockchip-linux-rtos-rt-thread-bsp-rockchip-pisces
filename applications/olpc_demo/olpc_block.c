@@ -1104,19 +1104,8 @@ static rt_err_t olpc_block_init(struct olpc_block_data *olpc_data)
     RT_ASSERT((wincfg.fblen) <= olpc_data->block_fblen);
 
     //refresh screen
-    {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
-    }
+    ret = rt_display_win_layers_set(&wincfg);
+    RT_ASSERT(ret == RT_EOK);
 
     olpc_data->cmd = CMD_UPDATE_GAME | CMD_UPDATE_GAME_BK | CMD_UPDATE_CTRL | CMD_UPDATE_CTRL_BK;
     rt_event_send(olpc_data->event, EVENT_DISPLAY_REFRESH);
@@ -1139,31 +1128,30 @@ static void olpc_block_deinit(struct olpc_block_data *olpc_data)
 /**
  * olpc block refresh process
  */
-static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data)
+static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-    wincfg.winId = BLOCK_GRAY1_WIN;
-    wincfg.fb    = olpc_data->block_fb;
-    wincfg.w     = ((BLOCK_FB_W + 31) / 32) * 32;
-    wincfg.h     = BLOCK_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.x     = BLOCK_REGION_X + (BLOCK_REGION_W - BLOCK_FB_W) / 2;
-    wincfg.y     = BLOCK_REGION_Y + (BLOCK_REGION_H - BLOCK_FB_H) / 2;
-    wincfg.ylast = wincfg.y;
+    wincfg->winId = BLOCK_GRAY1_WIN;
+    wincfg->fb    = olpc_data->block_fb;
+    wincfg->w     = ((BLOCK_FB_W + 31) / 32) * 32;
+    wincfg->h     = BLOCK_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h / 8;
+    wincfg->x     = BLOCK_REGION_X + (BLOCK_REGION_W - BLOCK_FB_W) / 2;
+    wincfg->y     = BLOCK_REGION_Y + (BLOCK_REGION_H - BLOCK_FB_H) / 2;
+    wincfg->ylast = wincfg->y;
 
-    RT_ASSERT((wincfg.w % 32) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->block_fblen);
+    RT_ASSERT((wincfg->w % 32) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->block_fblen);
 
     // draw game region
     img_info = &block_bkg_info;
@@ -1175,9 +1163,9 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
         {
             olpc_data->cmd &= ~CMD_UPDATE_GAME_BK;
 
-            RT_ASSERT(img_info->w <= wincfg.w);
-            RT_ASSERT(img_info->h <= wincfg.h);
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+            RT_ASSERT(img_info->w <= wincfg->w);
+            RT_ASSERT(img_info->h <= wincfg->h);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
         }
 
         // draw block
@@ -1199,7 +1187,9 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
                         {
                             img_info = &block_big1_info;
                         }
-                        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * i), yoffset + img_info->y + (img_info->h * j));
+                        rt_display_img_fill(img_info, wincfg->fb, wincfg->w,
+                                            xoffset + img_info->x + (img_info->w * i),
+                                            yoffset + img_info->y + (img_info->h * j));
                     }
                 }
             }
@@ -1233,7 +1223,7 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
                         {
                             img_info = &block_small1_info;
                         }
-                        rt_display_img_fill(img_info, wincfg.fb, wincfg.w,
+                        rt_display_img_fill(img_info, wincfg->fb, wincfg->w,
                                             xoffset + img_info->x + i * img_info->w,
                                             yoffset + img_info->y + j * img_info->h);
 
@@ -1250,19 +1240,19 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
             olpc_data->cmd &= ~CMD_UPDATE_GAME_SCORE;
 
             img_info = block_nums[(BlockGameScore / 10000) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 0), yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 0), yoffset + img_info->y);
 
             img_info = block_nums[(BlockGameScore / 1000) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 1), yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 1), yoffset + img_info->y);
 
             img_info = block_nums[(BlockGameScore / 100) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 2), yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 2), yoffset + img_info->y);
 
             img_info = block_nums[(BlockGameScore / 10) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 3), yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 3), yoffset + img_info->y);
 
             img_info = block_nums[(BlockGameScore / 1) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 4), yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 4), yoffset + img_info->y);
         }
 
         // draw hi-score
@@ -1273,19 +1263,19 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
             rt_uint16_t yyoff = 120;
 
             img_info = block_nums[(BlockGameHiScore / 10000) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 0), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 0), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(BlockGameHiScore / 1000) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 1), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 1), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(BlockGameHiScore / 100) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 2), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 2), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(BlockGameHiScore / 10) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 3), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 3), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(BlockGameHiScore / 1) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x + (img_info->w * 4), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x + (img_info->w * 4), yoffset + yyoff + img_info->y);
         }
 
         // draw level
@@ -1298,10 +1288,10 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
             rt_uint8_t  level = BlockGameLevel + 1;
 
             img_info = block_nums[(level / 10) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + xxoff + img_info->x + (img_info->w * 1), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + xxoff + img_info->x + (img_info->w * 1), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(level / 1) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + xxoff + img_info->x + (img_info->w * 2), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + xxoff + img_info->x + (img_info->w * 2), yoffset + yyoff + img_info->y);
         }
 
         // draw speed
@@ -1314,16 +1304,16 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
             rt_uint16_t speed = BLOCKTIMERDELAY - BlockGameLevel * BLOCKTIMEDECSIZE;
 
             img_info = block_nums[(speed / 1000) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + xxoff + img_info->x + (img_info->w * 0), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + xxoff + img_info->x + (img_info->w * 0), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(speed / 100) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + xxoff + img_info->x + (img_info->w * 1), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + xxoff + img_info->x + (img_info->w * 1), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(speed / 10) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + xxoff + img_info->x + (img_info->w * 2), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + xxoff + img_info->x + (img_info->w * 2), yoffset + yyoff + img_info->y);
 
             img_info = block_nums[(speed / 1) % 10];
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + xxoff + img_info->x + (img_info->w * 3), yoffset + yyoff + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + xxoff + img_info->x + (img_info->w * 3), yoffset + yyoff + img_info->y);
         }
 
         // draw game over
@@ -1332,56 +1322,39 @@ static rt_err_t olpc_block_game_region_refresh(struct olpc_block_data *olpc_data
             olpc_data->cmd &= ~CMD_UPDATE_GAME_OVER;
 
             img_info = &block_gameover_info;
-            rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+            rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
         }
     }
-
-    //refresh screen
-    {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
-    }
-
     return RT_EOK;
 }
 
 /**
  * olpc block refresh process
  */
-static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data)
+static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data,
+        struct rt_display_config *wincfg)
 {
     rt_err_t ret;
     rt_int16_t   xoffset, yoffset;
     rt_device_t  device = olpc_data->disp->device;
     image_info_t *img_info = NULL;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-    wincfg.winId = BLOCK_GRAY1_WIN;
-    wincfg.fb    = olpc_data->ctrl_fb;
-    wincfg.w     = ((CTRL_FB_W + 31) / 32) * 32;
-    wincfg.h     = CTRL_FB_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.x     = CTRL_REGION_X + (CTRL_REGION_W - CTRL_FB_W) / 2;
-    wincfg.y     = CTRL_REGION_Y + (CTRL_REGION_H - CTRL_FB_H) / 2;
-    wincfg.ylast = wincfg.y;
+    wincfg->winId = BLOCK_GRAY1_WIN;
+    wincfg->fb    = olpc_data->ctrl_fb;
+    wincfg->w     = ((CTRL_FB_W + 31) / 32) * 32;
+    wincfg->h     = CTRL_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h / 8;
+    wincfg->x     = CTRL_REGION_X + (CTRL_REGION_W - CTRL_FB_W) / 2;
+    wincfg->y     = CTRL_REGION_Y + (CTRL_REGION_H - CTRL_FB_H) / 2;
+    wincfg->ylast = wincfg->y;
 
-    RT_ASSERT((wincfg.w % 32) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT(wincfg.fblen <= olpc_data->ctrl_fblen);
+    RT_ASSERT((wincfg->w % 32) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->ctrl_fblen);
 
     // back ground
     img_info = &block_ctrl_info;
@@ -1393,9 +1366,9 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
     {
         olpc_data->cmd &= ~CMD_UPDATE_CTRL_BK;
 
-        RT_ASSERT(img_info->w <= wincfg.w);
-        RT_ASSERT(img_info->h <= wincfg.h);
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
 
@@ -1409,7 +1382,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_btnup1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     // down btn
@@ -1422,7 +1395,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_btndown1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     // left btn
@@ -1435,7 +1408,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_btnleft1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     // right btn
@@ -1448,7 +1421,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_btnright1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     // start btn
@@ -1461,7 +1434,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_start1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     // pause btn
@@ -1474,7 +1447,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_pause1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     // exit btn
@@ -1487,22 +1460,7 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
         {
             img_info = &block_exit1_info;
         }
-        rt_display_img_fill(img_info, wincfg.fb, wincfg.w, xoffset + img_info->x, yoffset + img_info->y);
-    }
-
-    //refresh screen
-    {
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_display_sync_hook(device);
-        RT_ASSERT(ret == RT_EOK);
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
-        RT_ASSERT(ret == RT_EOK);
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
     }
 
     return RT_EOK;
@@ -1513,16 +1471,31 @@ static rt_err_t olpc_block_ctrl_region_refresh(struct olpc_block_data *olpc_data
  */
 static rt_err_t olpc_block_task_fun(struct olpc_block_data *olpc_data)
 {
+    rt_err_t ret;
+    struct rt_display_config  wincfg;
+    struct rt_display_config *winhead = RT_NULL;
+
+    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+
     if ((olpc_data->cmd & CMD_UPDATE_GAME) == CMD_UPDATE_GAME)
     {
         olpc_data->cmd &= ~CMD_UPDATE_GAME;
-        olpc_block_game_region_refresh(olpc_data);
+        olpc_block_game_region_refresh(olpc_data, &wincfg);
     }
-    /* else */if ((olpc_data->cmd & CMD_UPDATE_CTRL) == CMD_UPDATE_CTRL)
+    else if ((olpc_data->cmd & CMD_UPDATE_CTRL) == CMD_UPDATE_CTRL)
     {
         olpc_data->cmd &= ~CMD_UPDATE_CTRL;
-        olpc_block_ctrl_region_refresh(olpc_data);
+        olpc_block_ctrl_region_refresh(olpc_data, &wincfg);
+    }
 
+    //refresh screen
+    rt_display_win_layers_list(&winhead, &wincfg);
+    ret = rt_display_win_layers_set(winhead);
+    RT_ASSERT(ret == RT_EOK);
+
+    if (olpc_data->cmd != 0)
+    {
+        rt_event_send(olpc_data->event, EVENT_DISPLAY_REFRESH);
     }
 
     return RT_EOK;
