@@ -298,7 +298,7 @@ const struct regulator_init regulator_inits[] =
 #endif
 
 #ifdef RT_USING_PM_REQ_PWR
-static uint32_t core_pwr_req[2];
+static uint32_t core_pwr_req[3];
 static struct req_pwr_desc req_pwr_array[] =
 {
     {
