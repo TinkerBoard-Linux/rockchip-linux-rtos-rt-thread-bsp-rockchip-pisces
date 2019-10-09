@@ -865,7 +865,8 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
         {
             post_scale.dstY = MIN(post_scale.dstY, cfg->y);
             post_scale.dstY = MIN(post_scale.dstY, cfg->ylast);
-            dstY2 = MAX(dstY2, post_scale.dstY + cfg->h + ABS(cfg->y - cfg->ylast));
+            dstY2 = MAX(dstY2, cfg->y + cfg->h);
+            dstY2 = MAX(dstY2, cfg->ylast + cfg->h);
 
             cfg = cfg->next;
         }

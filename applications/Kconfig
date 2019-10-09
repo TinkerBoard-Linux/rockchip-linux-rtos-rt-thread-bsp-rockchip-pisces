@@ -40,6 +40,11 @@ if RT_USING_OLPC_DEMO
         endchoice
     endif
 
+    config OLPC_APP_CLOCK_LOOP_LAMP
+        bool "olpc clock loop lamp enable"
+        depends on OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565
+        default n
+
 endif
 
 endmenu
