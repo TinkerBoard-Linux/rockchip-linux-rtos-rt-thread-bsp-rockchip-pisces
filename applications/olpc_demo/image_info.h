@@ -49,6 +49,7 @@ typedef struct
     uint16_t h;
     uint32_t size;
     uint8_t  *data;
+    uint32_t colorkey;
 } image_info_t;
 
 /**
@@ -56,5 +57,7 @@ typedef struct
  */
 #define IMG_TYPE_RAW        0
 #define IMG_TYPE_COMPRESS   1
+
+#define COLOR_KEY_EN        (0x01UL << 24)
 
 #endif

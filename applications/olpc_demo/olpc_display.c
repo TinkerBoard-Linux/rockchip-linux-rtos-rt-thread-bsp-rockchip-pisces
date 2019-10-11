@@ -765,6 +765,8 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
         {
             RT_ASSERT((xVir % 8) == 0);
 
+            rt_uint8_t colorkey = (rt_uint8_t)(img_info->colorkey & 0xff);
+
             if ((xoffset % 8) == 0)
             {
                 for (y = yoffset; y < yoffset + img_info->h; y++)
@@ -772,7 +774,21 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
                     i = (y - yoffset) * ((img_info->w + 7) / 8);
                     for (x = xoffset / 8; x < (xoffset + img_info->w) / 8; x++)
                     {
-                        fb[y * (xVir / 8) + x] = img_info->data[i++];
+                        if (img_info->colorkey & COLOR_KEY_EN)
+                        {
+                            if (colorkey)
+                            {
+                                fb[y * (xVir / 8) + x] &= img_info->data[i++];
+                            }
+                            else
+                            {
+                                fb[y * (xVir / 8) + x] |= img_info->data[i++];
+                            }
+                        }
+                        else
+                        {
+                            fb[y * (xVir / 8) + x] = img_info->data[i++];
+                        }
                     }
 
                     if (((xoffset + img_info->w) % 8) != 0)
@@ -792,10 +808,18 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
                     {
                         bitval = (img_info->data[i / 8] << (i % 8)) & 0x80;
 
+                        i++;
+                        if (img_info->colorkey & COLOR_KEY_EN)
+                        {
+                            if (((colorkey != 0) && (bitval != 0)) ||
+                                    ((colorkey == 0) && (bitval == 0)))
+                            {
+                                continue;
+                            }
+                        }
+
                         fb[y * (xVir / 8) + x / 8] &= ~(0x80 >> (x % 8));
                         fb[y * (xVir / 8) + x / 8] |= bitval >> (x % 8);
-
-                        i++;
                     }
                 }
             }
@@ -1053,11 +1077,10 @@ rt_err_t rt_display_sync_hook(rt_device_t device)
 
     for (i = 0; i < 100; i++)
     {
+        rt_thread_mdelay(1);
         ret = rt_device_control(device, RK_DISPLAY_CTRL_DISPLAY_SYNC, &display_sync_data);
         if (ret == RT_EOK)
             break;
-        else
-            rt_thread_mdelay(1);
     }
     if (i == 100)
         rt_kprintf("rt_display_sync_hook time out\n");

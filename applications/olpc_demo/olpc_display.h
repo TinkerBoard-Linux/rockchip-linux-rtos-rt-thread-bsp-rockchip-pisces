@@ -40,8 +40,6 @@
 #define WSCALE              (WIN_SCALED_W / WIN_LAYERS_W)
 #define HSCALE              (WIN_SCALED_H / WIN_LAYERS_H)
 
-#define COLOR_KEY_EN        (0x01UL << 24)
-
 /**
  * Global data struct for olpc display demo
  */
