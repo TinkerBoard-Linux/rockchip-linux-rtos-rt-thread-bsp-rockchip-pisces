@@ -1,3 +1,9 @@
+/**
+  * Copyright (c) 2019 Fuzhou Rockchip Electronics Co., Ltd
+  *
+  * SPDX-License-Identifier: Apache-2.0
+  */
+
 #include <rtthread.h>
 #if defined(OLPC_APP_SRCSAVER_ENABLE)
 

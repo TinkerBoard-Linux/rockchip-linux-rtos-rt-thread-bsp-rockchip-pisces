@@ -1,3 +1,9 @@
+/**
+  * Copyright (c) 2019 Fuzhou Rockchip Electronics Co., Ltd
+  *
+  * SPDX-License-Identifier: Apache-2.0
+  */
+
 #pragma once
 #include <stdint.h>
 
