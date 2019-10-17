@@ -713,6 +713,21 @@ void rt_display_update_lut(int format)
 }
 
 /**
+ * Check is if two display region overlapped
+ */
+rt_err_t olpc_display_overlay_check(rt_uint16_t y1, rt_uint16_t y2, rt_uint16_t yy1, rt_uint16_t yy2)
+{
+    if ((y2 < yy1) || (y1 > yy2))
+    {
+        // no overlay
+        return RT_EOK;
+    }
+
+    // overlay
+    return RT_ERROR;
+}
+
+/**
  * fill image data to fb buffer
  */
 void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset)
@@ -947,6 +962,10 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
         win_config.lut    = disp_data->lut[cfg->winId].lut;
         win_config.format = disp_data->lut[cfg->winId].format;
 
+        //rt_kprintf("winId = %d, srcX = %d, srcY = %d, srcW = %d, srcH =%d, lut = %d, format =%d\n",
+        //            win_config.winId, win_config.srcX, win_config.srcY, win_config.srcW, win_config.srcH,
+        //            win_config.lut,  win_config.format);
+
         ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_PLANE, &win_config);
         RT_ASSERT(ret == RT_EOK);
 
@@ -958,6 +977,20 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
 
     ret = rt_display_sync_hook(device);
     RT_ASSERT(ret == RT_EOK);
+
+    // close win
+    cfg = wincfg;
+    while (cfg != RT_NULL)
+    {
+        rt_memset(&win_config, 0, sizeof(struct CRTC_WIN_STATE));
+        win_config.winId = cfg->winId;
+        win_config.winEn = 0;
+        win_config.winUpdate = 1;
+        ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_PLANE, &win_config);
+        RT_ASSERT(ret == RT_EOK);
+
+        cfg = cfg->next;
+    }
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
     RT_ASSERT(ret == RT_EOK);

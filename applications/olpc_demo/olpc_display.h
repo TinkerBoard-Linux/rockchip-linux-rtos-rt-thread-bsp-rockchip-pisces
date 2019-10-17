@@ -99,6 +99,11 @@ void rt_display_rotate_24bit(float angle, int w, int h, unsigned char *src, unsi
 void rt_display_update_lut(int format);
 
 /**
+ * Check is if two display region overlapped
+ */
+rt_err_t olpc_display_overlay_check(rt_uint16_t y1, rt_uint16_t y2, rt_uint16_t yy1, rt_uint16_t yy2);
+
+/**
  * fill image data to fb buffer
  */
 void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb,
