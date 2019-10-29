@@ -1156,9 +1156,12 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
         return g_disp_data;
     }
 
+    rt_enter_critical();
+
     disp_data = (struct rt_display_data *)rt_malloc(sizeof(struct rt_display_data));
     RT_ASSERT(disp_data != RT_NULL);
     rt_memset((void *)disp_data, 0, sizeof(struct rt_display_data));
+    g_disp_data = disp_data;
 
     device = rt_device_find("lcd");
     RT_ASSERT(device != RT_NULL);
@@ -1227,7 +1230,8 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     disp_data->xres = WIN_LAYERS_W;
     disp_data->yres = WIN_LAYERS_H;
     disp_data->device = device;
-    g_disp_data = disp_data;
+
+    rt_exit_critical();
 
     return disp_data;
 }

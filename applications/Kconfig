@@ -22,6 +22,9 @@ if RT_USING_OLPC_DEMO
         config OLPC_APP_BLOCK_ENABLE
             bool "olpc block game select"
 
+        config OLPC_APP_SNAKE_ENABLE
+            bool "olpc snake game select"
+
         config OLPC_APP_NOTE_ENABLE
             bool "olpc note demo select"
 
