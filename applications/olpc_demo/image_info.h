@@ -48,7 +48,7 @@ typedef struct
     uint16_t w;
     uint16_t h;
     uint32_t size;
-    uint8_t  *data;
+    const uint8_t *data;
     uint32_t colorkey;
 } image_info_t;
 

@@ -1457,11 +1457,11 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
                                 (unsigned short *)((uint32_t)wincfg->fb + 2 * (yoffset * wincfg->w + xoffset)),
                                 background_w, 4, img_info->h / 2);
 #elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
-        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
+        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, (unsigned char *)img_info->data,
                                (unsigned char *)((uint32_t)wincfg->fb + (yoffset * wincfg->w + xoffset)),
                                background_w, 4, img_info->h / 2);
 #else
-        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
+        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, (unsigned char *)img_info->data,
                                (unsigned char *)((uint32_t)wincfg->fb + yoffset * wincfg->w + xoffset),
                                background_w, 16, img_info->h / 2);
 #endif
@@ -1481,11 +1481,11 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
                                 (unsigned short *)((uint32_t)wincfg->fb + 2 * (yoffset * wincfg->w + xoffset)),
                                 background_w, 4, img_info->h / 2);
 #elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
-        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
+        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, (unsigned char *)img_info->data,
                                (unsigned char *)((uint32_t)wincfg->fb + (yoffset * wincfg->w + xoffset)),
                                background_w, 4, img_info->h / 2);
 #else
-        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
+        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, (unsigned char *)img_info->data,
                                (unsigned char *)((uint32_t)wincfg->fb + yoffset * wincfg->w + xoffset),
                                background_w, 18, img_info->h / 2);
 #endif
@@ -1505,11 +1505,11 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
                                 (unsigned short *)((uint32_t)wincfg->fb + 2 * (yoffset * wincfg->w + xoffset)),
                                 background_w, 4, img_info->h / 2);
 #elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
-        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
+        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, (unsigned char *)img_info->data,
                                (unsigned char *)((uint32_t)wincfg->fb + (yoffset * wincfg->w + xoffset)),
                                background_w, 4, img_info->h / 2);
 #else
-        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, img_info->data,
+        rt_display_rotate_8bit((float)angle, img_info->w, img_info->h, (unsigned char *)img_info->data,
                                (unsigned char *)((uint32_t)wincfg->fb + yoffset * wincfg->w + xoffset),
                                background_w, 20, img_info->h / 2);
 #endif

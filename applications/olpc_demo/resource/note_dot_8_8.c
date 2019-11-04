@@ -8,7 +8,7 @@
 #if defined(OLPC_APP_NOTE_ENABLE)
 #include "image_info.h"
 
-static unsigned char note_dot_8_8[8UL] =
+static const unsigned char note_dot_8_8[8UL] =
 {
     0x3C, 0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C
 };
