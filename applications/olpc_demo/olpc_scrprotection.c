@@ -146,6 +146,7 @@ static void olpc_srcprotect_timer_callback(void *parameter)
     rt_event_send(olpc_data->disp_event, EVENT_SCRPROTECTION_REFRESH);
 }
 
+#if 0
 /**
  * screen protection screen clear.
  */
@@ -181,6 +182,7 @@ static void olpc_srcprotect_srcclear(struct olpc_srcprotect_data *olpc_data)
     ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);
 }
+#endif
 
 /**
  * screen protection refresh process
@@ -323,61 +325,22 @@ static rt_err_t olpc_srcprotect_screen_touch_unregister(void *parameter)
  */
 
 /**
- * screen protection init.
+ * olpc note lut set.
  */
-static rt_err_t olpc_srcprotect_start(struct olpc_srcprotect_data *olpc_data)
+static rt_err_t olpc_srcprotect_lutset(void *parameter)
 {
-#if defined(RT_USING_TOUCH)
-    olpc_srcprotect_screen_touch_register(olpc_data);
-#endif
-    olpc_srcprotect_srcclear(olpc_data);
+    rt_err_t ret = RT_EOK;
+    struct rt_display_lut lut0;
 
-    rt_timer_start(olpc_data->timer);
+    lut0.winId = SCRPROTECTION_GRAY1_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut0.lut  = bpp1_lut;
+    lut0.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
 
-    olpc_data->state = STATE_SCRPROTECTION_RUN;
-
-    return RT_EOK;
-}
-
-/**
- * screen protection deinit.
- */
-static rt_err_t olpc_srcprotect_stop(struct olpc_srcprotect_data *olpc_data)
-{
-    rt_err_t    ret;
-
-    ret = rt_timer_stop(olpc_data->timer);
+    ret = rt_display_lutset(&lut0, RT_NULL, RT_NULL);
     RT_ASSERT(ret == RT_EOK);
 
-#if defined(RT_USING_TOUCH)
-    olpc_srcprotect_screen_touch_unregister(olpc_data);
-#endif
-
-    olpc_srcprotect_srcclear(olpc_data);
-
-    olpc_data->state = STATE_SCRPROTECTION_STOP;
-
-    if (olpc_data->exithook)
-    {
-        olpc_data->exithook(olpc_data->exithookparam);
-    }
-    olpc_data->exithook = RT_NULL;
-
-    return RT_EOK;
-}
-
-/**
- * screen protection start API.
- */
-void olpc_srcprotect_app_start(rt_err_t (*hook)(void *parameter), void *parameter)
-{
-    struct olpc_srcprotect_data *olpc_data = g_srcprotect_data;
-
-    olpc_data->exithook      = hook;
-    olpc_data->exithookparam = parameter;
-
-    olpc_data->cmd   = CMD_ANIMAL_UPDATE;
-    rt_event_send(olpc_data->disp_event, EVENT_SCRPROTECTION_START | EVENT_SCRPROTECTION_REFRESH);
+    return ret;
 }
 
 /**
@@ -388,23 +351,21 @@ static void olpc_srcprotect_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_srcprotect_data *olpc_data;
-    struct rt_display_lut lut0;
     struct rt_device_graphic_info info;
 
     olpc_data = (struct olpc_srcprotect_data *)rt_malloc(sizeof(struct olpc_srcprotect_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_srcprotect_data));
+    g_srcprotect_data = olpc_data;
 
     olpc_data->picid = 0;
     olpc_data->state = STATE_SCRPROTECTION_STOP;
-    g_srcprotect_data = olpc_data;
 
-    lut0.winId = SCRPROTECTION_GRAY1_WIN;
-    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    lut0.lut  = bpp1_lut;
-    lut0.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-    olpc_data->disp = rt_display_init(&lut0, RT_NULL, RT_NULL);
+    olpc_data->disp = rt_display_get_disp();
     RT_ASSERT(olpc_data->disp != RT_NULL);
+
+    ret = olpc_srcprotect_lutset(olpc_data);
+    RT_ASSERT(ret == RT_EOK);
 
     rt_device_t  device = olpc_data->disp->device;
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
@@ -415,15 +376,25 @@ static void olpc_srcprotect_thread(void *p)
     RT_ASSERT(olpc_data->fb != RT_NULL);
     rt_memset(olpc_data->fb, 0, olpc_data->fblen);
 
+    //olpc_srcprotect_srcclear(olpc_data);
+
+#if defined(RT_USING_TOUCH)
+    olpc_srcprotect_screen_touch_register(olpc_data);
+#endif
+
+    olpc_data->disp_event = rt_event_create("srcprotect", RT_IPC_FLAG_FIFO);
+    RT_ASSERT(olpc_data->disp_event != RT_NULL);
+
     olpc_data->timer = rt_timer_create("srcprotect",
                                        olpc_srcprotect_timer_callback,
                                        (void *)olpc_data,
                                        SCRPROTECTION_REFRESH_TIME,
                                        RT_TIMER_FLAG_PERIODIC);
     RT_ASSERT(olpc_data->timer != RT_NULL);
+    rt_timer_start(olpc_data->timer);
 
-    olpc_data->disp_event = rt_event_create("srcprotect", RT_IPC_FLAG_FIFO);
-    RT_ASSERT(olpc_data->disp_event != RT_NULL);
+    olpc_data->cmd   = CMD_ANIMAL_UPDATE;
+    rt_event_send(olpc_data->disp_event, EVENT_SCRPROTECTION_START | EVENT_SCRPROTECTION_REFRESH);
 
     while (1)
     {
@@ -435,12 +406,6 @@ static void olpc_srcprotect_thread(void *p)
             /* Reserved... */
         }
 
-        if (event & EVENT_SCRPROTECTION_START)
-        {
-            ret = olpc_srcprotect_start(olpc_data);
-            RT_ASSERT(ret == RT_EOK);
-        }
-
         if (event & EVENT_SCRPROTECTION_REFRESH)
         {
             ret = olpc_srcprotect_task_fun(olpc_data);
@@ -449,8 +414,8 @@ static void olpc_srcprotect_thread(void *p)
 
         if (event & EVENT_SCRPROTECTION_EXIT)
         {
-            ret = olpc_srcprotect_stop(olpc_data);
-            RT_ASSERT(ret == RT_EOK);
+            //olpc_srcprotect_srcclear(olpc_data);
+            break;
         }
     }
 
@@ -458,20 +423,31 @@ static void olpc_srcprotect_thread(void *p)
     rt_timer_stop(olpc_data->timer);
     ret = rt_timer_delete(olpc_data->timer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->timer = RT_NULL;
+
+#if defined(RT_USING_TOUCH)
+    olpc_srcprotect_screen_touch_unregister(olpc_data);
+#endif
 
     rt_event_delete(olpc_data->disp_event);
-
-    rt_display_deinit(olpc_data->disp);
+    olpc_data->disp_event = RT_NULL;
 
     rt_free_large((void *)olpc_data->fb);
+    olpc_data->fb = RT_NULL;
+
+    if (olpc_data->exithook)
+    {
+        olpc_data->exithook(olpc_data->exithookparam);
+    }
 
     rt_free((void *)olpc_data);
+    olpc_data = RT_NULL;
 }
 
 /**
- * screen protection application init.
+ * screen protection start API.
  */
-int olpc_srcprotect_app_init(void)
+void olpc_srcprotect_app_init(rt_err_t (*hook)(void *parameter), void *parameter)
 {
     static rt_thread_t rtt_srcprotect;
 
@@ -480,8 +456,15 @@ int olpc_srcprotect_app_init(void)
 
     rt_thread_startup(rtt_srcprotect);
 
-    return RT_EOK;
+    // wait for thread initied
+    do
+    {
+        rt_thread_delay(1);
+    }
+    while (g_srcprotect_data == RT_NULL);
+
+    g_srcprotect_data->exithook      = hook;
+    g_srcprotect_data->exithookparam = parameter;
 }
-//INIT_APP_EXPORT(olpc_srcprotect_app_init);
 
 #endif

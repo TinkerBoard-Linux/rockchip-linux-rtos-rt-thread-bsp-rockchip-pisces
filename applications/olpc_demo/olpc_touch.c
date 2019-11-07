@@ -291,6 +291,16 @@ static void touch_mgr_thread_entry(void *parameter)
     rt_device_close((rt_device_t)touch_dev);
 }
 
+void olpc_touch_list_clear(void)
+{
+    struct olpc_touch_item *head = &g_olpc_touch.touch_header;
+
+    head->next = head;
+    head->prev = head;
+    g_olpc_touch.touch_list = head;
+    g_olpc_touch.state = TOUCH_EVENT_UP;//TOUCH_EVENT_NULL;
+}
+
 int olpc_touch_init(void)
 {
     struct olpc_touch_item *head = &g_olpc_touch.touch_header;

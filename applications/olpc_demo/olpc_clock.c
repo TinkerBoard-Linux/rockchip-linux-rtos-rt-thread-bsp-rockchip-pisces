@@ -98,6 +98,7 @@ static uint32_t bpp1_lut[2] =
 
 /* Event define */
 #define EVENT_UPDATE_CLOCK  (0x01UL << 0)
+#define EVENT_EXIT_CLOCK    (0x01UL << 1)
 
 /* Command define */
 #define UPDATE_CLOCK        (0x01UL << 0)
@@ -412,6 +413,36 @@ static rt_slist_t glamplist = RT_SLIST_OBJECT_INIT(glamplist);
  *
  **************************************************************************************************
  */
+
+/**
+ * olpc clock lut set.
+ */
+static rt_err_t olpc_clock_lutset(void *parameter)
+{
+    rt_err_t ret = RT_EOK;
+    struct rt_display_lut lut0, lut1, lut2;
+
+    lut0.winId = CLOCK_RGB332_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    lut0.lut  = bpp_lut;
+    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
+
+    lut1.winId = CLOCK_GRAY1_WIN;
+    lut1.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut1.lut  = bpp1_lut;
+    lut1.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
+
+    lut2.winId = CLOCK_RGB565_WIN;
+    lut2.format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+    lut2.lut  = RT_NULL;
+    lut2.size = 0;
+
+    ret = rt_display_lutset(&lut0, &lut1, &lut2);
+    RT_ASSERT(ret == RT_EOK);
+
+    return ret;
+}
+
 /**
  * Clock timer callback.
  */
@@ -523,7 +554,6 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 {
     rt_err_t    ret;
     rt_device_t device = olpc_data->disp->device;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
@@ -576,25 +606,30 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
     olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
     RT_ASSERT(olpc_data->fb != RT_NULL);
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+#if 0
+    {
+        struct rt_display_config wincfg;
+        rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
 
-    wincfg.winId = CLOCK_RGB332_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.x     = 0;
-    wincfg.y     = 0;
-    wincfg.w     = 4;
-    wincfg.h     = WIN_LAYERS_H;
-    wincfg.fblen = wincfg.w * wincfg.h;
+        wincfg.winId = CLOCK_RGB332_WIN;
+        wincfg.fb    = olpc_data->fb;
+        wincfg.x     = 0;
+        wincfg.y     = 0;
+        wincfg.w     = 4;
+        wincfg.h     = WIN_LAYERS_H;
+        wincfg.fblen = wincfg.w * wincfg.h;
 
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
+        RT_ASSERT((wincfg.w % 4) == 0);
+        RT_ASSERT((wincfg.h % 2) == 0);
+        RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
 
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+        rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
-    //refresh screen
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+        //refresh screen
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+    }
+#endif
 
     // create sreen touch timer
     olpc_data->src_timer = rt_timer_create("srctimer",
@@ -646,26 +681,44 @@ static void olpc_clock_deinit(struct olpc_clock_data *olpc_data)
     rt_timer_stop(olpc_data->lamp_timer);
     ret = rt_timer_delete(olpc_data->lamp_timer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->lamp_timer = RT_NULL;
 #endif
 
     rt_timer_stop(olpc_data->fp_timer);
     ret = rt_timer_delete(olpc_data->fp_timer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->fp_timer = RT_NULL;
 
     rt_timer_stop(olpc_data->src_timer);
     ret = rt_timer_delete(olpc_data->src_timer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->src_timer = RT_NULL;
 
     ret = rt_timer_stop(olpc_data->clock_timer);
     RT_ASSERT(ret == RT_EOK);
 
     ret = rt_timer_delete(olpc_data->clock_timer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->clock_timer = RT_NULL;
 
     rt_free_large((void *)olpc_data->fb);
+    olpc_data->fb = RT_NULL;
 
 #if defined(OLPC_APP_CLOCK_LOOP_LAMP)
+    //clear list
+    {
+        rt_slist_t *list = RT_NULL;
+        struct olpc_lamp_disp_t *lamp = RT_NULL;
+        rt_slist_for_each(list, &glamplist)
+        {
+            lamp = (struct olpc_lamp_disp_t *)list;
+            rt_slist_remove(&glamplist, list);
+            rt_free(lamp);
+        }
+    }
+
     rt_free_large((void *)olpc_data->lampfb);
+    olpc_data->lampfb = RT_NULL;
 #endif
 }
 
@@ -969,7 +1022,7 @@ static rt_err_t olpc_lamplist_create(void *parameter)
     struct olpc_lamp_disp_t *plamp = RT_NULL;
     rt_int16_t start, end;
 
-    //rt_slist_init(&glamplist);
+    rt_slist_init(&glamplist);
 
     // top line check
     for (start = 0; start < LAMP_HORIZONTAL_NUM; start++)
@@ -2292,6 +2345,33 @@ static rt_err_t olpc_clock_home_touch_callback(rt_int32_t touch_id, enum olpc_to
         olpc_data->home_id = touch_id;
         olpc_data->cmd |= UPDATE_HOME;
         rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+
+        rt_thread_delay(10);
+        if (olpc_data->home_id == 3)
+        {
+#if defined(OLPC_APP_NOTE_ENABLE)
+            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //note
+#endif
+        }
+        else if (olpc_data->home_id == 4)
+        {
+#if defined(OLPC_APP_SNAKE_ENABLE)
+            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //snake
+#endif
+        }
+        else if (olpc_data->home_id == 5)
+        {
+#if defined(OLPC_APP_EBOOK_ENABLE)
+            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //ebook
+#endif
+        }
+        else if (olpc_data->home_id == 6)
+        {
+#if defined(OLPC_APP_BLOCK_ENABLE)
+            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //block
+#endif
+        }
+
         ret = RT_EOK;
         break;
 
@@ -2499,31 +2579,13 @@ static void olpc_clock_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_clock_data *olpc_data;
-    struct rt_display_lut lut0, lut1, lut2;
+    rt_uint8_t  home_id;
 
     olpc_data = (struct olpc_clock_data *)rt_malloc(sizeof(struct olpc_clock_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_clock_data));
 
-    /* init bpp_lut[256] */
-    rt_display_update_lut(FORMAT_RGB_332);
-
-    lut0.winId = CLOCK_RGB332_WIN;
-    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
-    lut0.lut  = bpp_lut;
-    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
-
-    lut1.winId = CLOCK_GRAY1_WIN;
-    lut1.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    lut1.lut  = bpp1_lut;
-    lut1.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    lut2.winId = CLOCK_RGB565_WIN;
-    lut2.format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-    lut2.lut  = RT_NULL;
-    lut2.size = 0;
-
-    olpc_data->disp = rt_display_init(&lut0, &lut1, &lut2);
+    olpc_data->disp = rt_display_get_disp();
     RT_ASSERT(olpc_data->disp != RT_NULL);
 
 #if defined(RT_USING_TOUCH)
@@ -2536,11 +2598,14 @@ static void olpc_clock_thread(void *p)
     ret = olpc_clock_init(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
+    ret = olpc_clock_lutset(olpc_data);
+    RT_ASSERT(ret == RT_EOK);
+
     rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
 
     while (1)
     {
-        ret = rt_event_recv(olpc_data->disp_event, EVENT_UPDATE_CLOCK,
+        ret = rt_event_recv(olpc_data->disp_event, EVENT_UPDATE_CLOCK | EVENT_EXIT_CLOCK,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         if (ret != RT_EOK)
@@ -2553,20 +2618,52 @@ static void olpc_clock_thread(void *p)
             ret = olpc_clock_task_fun(olpc_data);
             RT_ASSERT(ret == RT_EOK);
         }
+
+        if (event & EVENT_EXIT_CLOCK)
+        {
+            break;
+        }
     }
 
     /* Thread deinit */
 #if defined(RT_USING_TOUCH)
     olpc_clock_screen_touch_unregister(olpc_data);
+    olpc_touch_list_clear();
 #endif
 
     olpc_clock_deinit(olpc_data);
 
     rt_event_delete(olpc_data->disp_event);
+    olpc_data->disp_event = RT_NULL;
 
-    rt_display_deinit(olpc_data->disp);
-
+    home_id = olpc_data->home_id;
     rt_free(olpc_data);
+    olpc_data = RT_NULL;
+
+    if (home_id == 3)
+    {
+#if defined(OLPC_APP_NOTE_ENABLE)
+        rt_event_send(olpc_main_event, EVENT_APP_NOTE);
+#endif
+    }
+    else if (home_id == 4)
+    {
+#if defined(OLPC_APP_SNAKE_ENABLE)
+        rt_event_send(olpc_main_event, EVENT_APP_SNAKE);
+#endif
+    }
+    else if (home_id == 5)
+    {
+#if defined(OLPC_APP_EBOOK_ENABLE)
+        rt_event_send(olpc_main_event, EVENT_APP_EBOOK);
+#endif
+    }
+    else if (home_id == 6)
+    {
+#if defined(OLPC_APP_BLOCK_ENABLE)
+        rt_event_send(olpc_main_event, EVENT_APP_BLOCK);
+#endif
+    }
 }
 
 /**
@@ -2583,5 +2680,5 @@ int olpc_clock_app_init(void)
     return RT_EOK;
 }
 
-INIT_APP_EXPORT(olpc_clock_app_init);
+//INIT_APP_EXPORT(olpc_clock_app_init);
 #endif

@@ -73,8 +73,9 @@ static uint32_t bpp1_lut[2] =
 /* Event define */
 #define EVENT_DISPLAY_REFRESH   (0x01UL << 0)
 #define EVENT_GAME_PROCESS      (0x01UL << 1)
-#define EVENT_SRCSAVER_ENTER    (0x01UL << 2)
-#define EVENT_SRCSAVER_EXIT     (0x01UL << 3)
+#define EVENT_GAME_EXIT         (0x01UL << 2)
+#define EVENT_SRCSAVER_ENTER    (0x01UL << 3)
+#define EVENT_SRCSAVER_EXIT     (0x01UL << 4)
 
 /* Game command define */
 #define CMD_GAME_SNAKE_MOVE     (0x01UL << 0)
@@ -239,7 +240,7 @@ rt_int8_t m_snakeArraybk[SNAKEGAME_SCOPE_ROW][SNAKEGAME_SCOPE_COL];
 struct tagSnakePoint m_ptFood[SNAKEGAME_SNAKE_MAXFOOD];
 struct tagSnakePoint m_ptSnake[SNAKEGAME_SNAKE_MAXLEN];
 
-rt_timer_t m_snakeTimerID;
+rt_timer_t m_snakeTimerID = RT_NULL;
 
 /*
  **************************************************************************************************
@@ -770,8 +771,11 @@ static rt_err_t snake_game_init(void *parameter)
 static void snake_game_deinit(void *parameter)
 {
     rt_err_t ret;
+
     ret = rt_timer_delete(m_snakeTimerID);
     RT_ASSERT(ret == RT_EOK);
+
+    m_snakeTimerID = RT_NULL;
 }
 
 /**
@@ -826,6 +830,31 @@ static rt_err_t olpc_game_task_fun(struct olpc_snake_data *olpc_data)
  *
  **************************************************************************************************
  */
+
+/**
+ * olpc note lut set.
+ */
+static rt_err_t olpc_snake_lutset(void *parameter)
+{
+    rt_err_t ret = RT_EOK;
+    struct rt_display_lut lut0, lut1;
+
+    lut0.winId  = SNAKE_GRAY0_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut0.lut    = bpp0_lut;
+    lut0.size   = sizeof(bpp0_lut) / sizeof(bpp0_lut[0]);
+
+    lut1.winId  = SNAKE_GRAY1_WIN;
+    lut1.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut1.lut    = bpp1_lut;
+    lut1.size   = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
+
+    ret = rt_display_lutset(&lut0, &lut1, RT_NULL);
+    RT_ASSERT(ret == RT_EOK);
+
+    return ret;
+}
+
 /**
  * olpc snake demo init.
  */
@@ -833,7 +862,6 @@ static rt_err_t olpc_snake_init(struct olpc_snake_data *olpc_data)
 {
     rt_err_t    ret;
     rt_device_t device = olpc_data->disp->device;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
@@ -857,7 +885,9 @@ static rt_err_t olpc_snake_init(struct olpc_snake_data *olpc_data)
     rt_memset((void *)olpc_data->ctrl1_fb, 0x00, olpc_data->ctrl1_fblen);
 
     // clear screen
+#if 0
     {
+        struct rt_display_config wincfg;
         rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
         wincfg.winId = SNAKE_GRAY1_WIN;
         wincfg.fb    = olpc_data->snake_fb;
@@ -876,6 +906,7 @@ static rt_err_t olpc_snake_init(struct olpc_snake_data *olpc_data)
         ret = rt_display_win_layers_set(&wincfg);
         RT_ASSERT(ret == RT_EOK);
     }
+#endif
 
     snake_game_init(olpc_data);
 
@@ -895,8 +926,13 @@ static void olpc_snake_deinit(struct olpc_snake_data *olpc_data)
     snake_game_deinit(olpc_data);
 
     rt_free_large((void *)olpc_data->ctrl1_fb);
+    olpc_data->ctrl1_fb = RT_NULL;
+
     rt_free_large((void *)olpc_data->ctrl0_fb);
+    olpc_data->ctrl0_fb = RT_NULL;
+
     rt_free_large((void *)olpc_data->snake_fb);
+    olpc_data->snake_fb = RT_NULL;
 }
 
 /**
@@ -1397,6 +1433,9 @@ static rt_err_t olpc_snake_btnexit_touch_callback(rt_int32_t touch_id, enum olpc
         olpc_data->btnexitsta = 0;
         olpc_data->cmd |= CMD_UPDATE_CTRL0 | CMD_UPDATE_CTRL0_EXIT;
         rt_event_send(olpc_data->event, EVENT_DISPLAY_REFRESH);
+
+        rt_thread_delay(10);
+        rt_event_send(olpc_data->event, EVENT_GAME_EXIT);
         break;
 
     default:
@@ -1496,11 +1535,15 @@ static rt_err_t olpc_snake_screen_touch_callback(rt_int32_t touch_id, enum olpc_
     switch (event)
     {
     default:
-#if defined(OLPC_APP_SRCSAVER_ENABLE)
-        rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
-#endif
         break;
     }
+
+#if defined(OLPC_APP_SRCSAVER_ENABLE)
+    if ((olpc_data) && (olpc_data->srctimer))
+    {
+        rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
+    }
+#endif
 
     return ret;
 }
@@ -1592,10 +1635,14 @@ static void olpc_snake_screen_timer_stop(void *parameter)
  */
 static rt_err_t olpc_snake_screen_protection_enter(void *parameter)
 {
-    olpc_snake_touch_unregister(parameter);
     olpc_snake_screen_timer_stop(parameter);
 
-    olpc_srcprotect_app_start(olpc_snake_screen_protection_hook, parameter);
+#if defined(RT_USING_TOUCH)
+    olpc_snake_touch_unregister(parameter);
+    olpc_touch_list_clear();
+#endif
+
+    olpc_srcprotect_app_init(olpc_snake_screen_protection_hook, parameter);
 
     return RT_EOK;
 }
@@ -1607,7 +1654,11 @@ static rt_err_t olpc_snake_screen_protection_exit(void *parameter)
 {
     struct olpc_snake_data *olpc_data = (struct olpc_snake_data *)parameter;
 
+    olpc_snake_lutset(olpc_data);    //reset lut
+
+#if defined(RT_USING_TOUCH)
     olpc_snake_touch_register(parameter);
+#endif
     olpc_snake_screen_timer_start(parameter);
 
     snake_arraybk_clear();
@@ -1641,24 +1692,16 @@ static void olpc_snake_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_snake_data *olpc_data;
-    struct rt_display_lut lut0, lut1;
 
     olpc_data = (struct olpc_snake_data *)rt_malloc(sizeof(struct olpc_snake_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_snake_data));
 
-    lut0.winId  = SNAKE_GRAY0_WIN;
-    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    lut0.lut    = bpp0_lut;
-    lut0.size   = sizeof(bpp0_lut) / sizeof(bpp0_lut[0]);
-
-    lut1.winId  = SNAKE_GRAY1_WIN;
-    lut1.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    lut1.lut    = bpp1_lut;
-    lut1.size   = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    olpc_data->disp = rt_display_init(&lut0,  &lut1, RT_NULL);
+    olpc_data->disp = rt_display_get_disp();
     RT_ASSERT(olpc_data->disp != RT_NULL);
+
+    ret = olpc_snake_lutset(olpc_data);
+    RT_ASSERT(ret == RT_EOK);
 
     olpc_data->event = rt_event_create("snake_event", RT_IPC_FLAG_FIFO);
     RT_ASSERT(olpc_data->event != RT_NULL);
@@ -1683,7 +1726,7 @@ static void olpc_snake_thread(void *p)
     while (1)
     {
         ret = rt_event_recv(olpc_data->event,
-                            EVENT_GAME_PROCESS | EVENT_DISPLAY_REFRESH | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
+                            EVENT_GAME_PROCESS | EVENT_GAME_EXIT | EVENT_DISPLAY_REFRESH | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         if (ret != RT_EOK)
@@ -1716,6 +1759,10 @@ static void olpc_snake_thread(void *p)
             RT_ASSERT(ret == RT_EOK);
         }
 #endif
+        if (event & EVENT_GAME_EXIT)
+        {
+            break;
+        }
     }
 
     /* Thread deinit */
@@ -1723,19 +1770,23 @@ static void olpc_snake_thread(void *p)
     rt_timer_stop(olpc_data->srctimer);
     ret = rt_timer_delete(olpc_data->srctimer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->srctimer = RT_NULL;
 #endif
 
 #if defined(RT_USING_TOUCH)
     olpc_snake_touch_unregister(olpc_data);
+    olpc_touch_list_clear();
 #endif
 
     olpc_snake_deinit(olpc_data);
 
     rt_event_delete(olpc_data->event);
-
-    rt_display_deinit(olpc_data->disp);
+    olpc_data->event = RT_NULL;
 
     rt_free(olpc_data);
+    olpc_data = RT_NULL;
+
+    rt_event_send(olpc_main_event, EVENT_APP_CLOCK);
 }
 
 /**
@@ -1749,12 +1800,8 @@ int olpc_snake_app_init(void)
     RT_ASSERT(rtt_snake != RT_NULL);
     rt_thread_startup(rtt_snake);
 
-#if defined(OLPC_APP_SRCSAVER_ENABLE)
-    olpc_srcprotect_app_init();
-#endif
-
     return RT_EOK;
 }
 
-INIT_APP_EXPORT(olpc_snake_app_init);
+//INIT_APP_EXPORT(olpc_snake_app_init);
 #endif

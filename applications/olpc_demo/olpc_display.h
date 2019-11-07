@@ -40,6 +40,12 @@
 #define WSCALE              (WIN_SCALED_W / WIN_LAYERS_W)
 #define HSCALE              (WIN_SCALED_H / WIN_LAYERS_H)
 
+#define EVENT_APP_CLOCK  (0x01UL << 0)
+#define EVENT_APP_EBOOK  (0x01UL << 1)
+#define EVENT_APP_BLOCK  (0x01UL << 2)
+#define EVENT_APP_SNAKE  (0x01UL << 3)
+#define EVENT_APP_NOTE   (0x01UL << 4)
+
 /**
  * Global data struct for olpc display demo
  */
@@ -84,6 +90,8 @@ typedef struct rt_display_data *rt_display_data_t;
  * color palette for RGB332
  */
 extern uint32_t bpp_lut[256];
+
+extern rt_event_t olpc_main_event;
 
 /**
  * display rotate.
@@ -147,6 +155,12 @@ rt_err_t rt_display_sync_hook(rt_device_t device);
 rt_err_t rt_display_update_hook(rt_device_t device, uint8_t winid);
 
 /**
+ * Display lut set.
+ */
+rt_err_t rt_display_lutset(struct rt_display_lut *lutA,
+                           struct rt_display_lut *lutB,
+                           struct rt_display_lut *lutC);
+/**
  * Display application initial, initial screen and win layers.
  */
 rt_display_data_t rt_display_init(struct rt_display_lut *lut0,
@@ -154,10 +168,14 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lut0,
                                   struct rt_display_lut *lut2);
 
 /**
+ * Get global display data struct.
+ */
+rt_display_data_t rt_display_get_disp(void);
+
+/**
  * Display application deinitial, free resources.
  */
 void rt_display_deinit(rt_display_data_t disp_data);
-
 
 /**
  * Get MAX value of backlight.
@@ -165,9 +183,33 @@ void rt_display_deinit(rt_display_data_t disp_data);
 rt_uint16_t rt_display_get_bl_max(rt_device_t device);
 
 /**
+ * olpc clock demo application init.
+ */
+int olpc_clock_app_init(void);
+
+/**
+ * olpc ebook demo application init.
+ */
+int olpc_ebook_app_init(void);
+
+/**
+ * olpc block demo application init.
+ */
+int olpc_block_app_init(void);
+
+/**
+ * olpc note demo application init.
+ */
+int olpc_note_app_init(void);
+
+/**
+ * olpc snake demo application init.
+ */
+int olpc_snake_app_init(void);
+
+/**
  * screen protection API.
  */
-int olpc_srcprotect_app_init(void);
-void olpc_srcprotect_app_start(rt_err_t (*exithook)(void *parameter), void *parameter);
+void olpc_srcprotect_app_init(rt_err_t (*exithook)(void *parameter), void *parameter);
 
 #endif

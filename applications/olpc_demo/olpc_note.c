@@ -51,8 +51,9 @@ static uint32_t bpp1_lut[2] =
 
 /* Event define */
 #define EVENT_NOTE_REFRESH     (0x01UL << 0)
-#define EVENT_SRCSAVER_ENTER   (0x01UL << 1)
-#define EVENT_SRCSAVER_EXIT    (0x01UL << 2)
+#define EVENT_NOTE_EXIT        (0x01UL << 1)
+#define EVENT_SRCSAVER_ENTER   (0x01UL << 2)
+#define EVENT_SRCSAVER_EXIT    (0x01UL << 3)
 
 /* Command define */
 #define UPDATE_DRAW            (0x01UL << 0)
@@ -134,6 +135,26 @@ struct olpc_note_touch_point note_point_buffer[NOTE_POINT_BUFFER_SIZE];
  *
  **************************************************************************************************
  */
+
+/**
+ * olpc note lut set.
+ */
+static rt_err_t olpc_note_lutset(void *parameter)
+{
+    rt_err_t ret = RT_EOK;
+    struct rt_display_lut lut0;
+
+    lut0.winId = NOTE_TEXT_GRAY1_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut0.lut  = bpp1_lut;
+    lut0.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
+
+    ret = rt_display_lutset(&lut0, RT_NULL, RT_NULL);
+    RT_ASSERT(ret == RT_EOK);
+
+    return ret;
+}
+
 /**
  * olpc note demo init.
  */
@@ -141,7 +162,6 @@ static rt_err_t olpc_note_init(struct olpc_note_data *olpc_data)
 {
     rt_err_t    ret;
     rt_device_t device = olpc_data->disp->device;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
@@ -171,23 +191,28 @@ static rt_err_t olpc_note_init(struct olpc_note_data *olpc_data)
     RT_ASSERT(olpc_data->ctrlfb != RT_NULL);
     rt_memset((void *)olpc_data->ctrlfb, 0x00, olpc_data->ctrlfblen);
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+#if 0
+    {
+        struct rt_display_config wincfg;
+        rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
 
-    wincfg.winId = NOTE_TEXT_GRAY1_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = 32;
-    wincfg.h     = WIN_LAYERS_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.x     = 0;
-    wincfg.y     = 0;
-    wincfg.ylast = wincfg.y;
+        wincfg.winId = NOTE_TEXT_GRAY1_WIN;
+        wincfg.fb    = olpc_data->fb;
+        wincfg.w     = 32;
+        wincfg.h     = WIN_LAYERS_H;
+        wincfg.fblen = wincfg.w * wincfg.h / 8;
+        wincfg.x     = 0;
+        wincfg.y     = 0;
+        wincfg.ylast = wincfg.y;
 
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
+        RT_ASSERT((wincfg.w % 4) == 0);
+        RT_ASSERT((wincfg.h % 2) == 0);
+        RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
 
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+    }
+#endif
 
     return RT_EOK;
 }
@@ -198,9 +223,14 @@ static rt_err_t olpc_note_init(struct olpc_note_data *olpc_data)
 static void olpc_note_deinit(struct olpc_note_data *olpc_data)
 {
     rt_free_large((void *)olpc_data->ctrlfb);
+    olpc_data->ctrlfb = RT_NULL;
+
     rt_free_large((void *)olpc_data->fb);
+    olpc_data->fb = RT_NULL;
+
 #ifdef NOTE_TEST
     rt_free_dtcm((void *)olpc_data->savefb);
+    olpc_data->savefb = RT_NULL;
 #endif
 }
 
@@ -424,7 +454,10 @@ static rt_err_t olpc_note_screen_touch_callback(rt_int32_t touch_id, enum olpc_t
     }
 
 #if defined(OLPC_APP_SRCSAVER_ENABLE)
-    rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
+    if ((olpc_data) && (olpc_data->srctimer))
+    {
+        rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
+    }
 #endif
 
     return ret;
@@ -625,6 +658,8 @@ static rt_err_t olpc_note_btnsave_touch_callback(rt_int32_t touch_id, enum olpc_
 #ifdef NOTE_TEST
         rt_memcpy(olpc_data->savefb, olpc_data->fb, olpc_data->fblen);
 #endif
+        rt_thread_delay(10);
+        rt_event_send(olpc_data->disp_event, EVENT_NOTE_EXIT);
         break;
 
     default:
@@ -750,10 +785,11 @@ static rt_err_t olpc_note_screen_protection_enter(void *parameter)
 
 #if defined(RT_USING_TOUCH)
     olpc_note_touch_unregister(parameter);
+    olpc_touch_list_clear();
 #endif
 
     // register exit hook & start screen protection
-    olpc_srcprotect_app_start(olpc_note_screen_protection_hook, parameter);
+    olpc_srcprotect_app_init(olpc_note_screen_protection_hook, parameter);
 
     return RT_EOK;
 }
@@ -764,6 +800,8 @@ static rt_err_t olpc_note_screen_protection_enter(void *parameter)
 static rt_err_t olpc_note_screen_protection_exit(void *parameter)
 {
     struct olpc_note_data *olpc_data = (struct olpc_note_data *)parameter;
+
+    olpc_note_lutset(olpc_data);
 
 #if defined(RT_USING_TOUCH)
     olpc_note_touch_register(parameter);
@@ -795,19 +833,16 @@ static void olpc_note_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_note_data *olpc_data;
-    struct rt_display_lut pagelut;
 
     olpc_data = (struct olpc_note_data *)rt_malloc(sizeof(struct olpc_note_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_note_data));
 
-    pagelut.winId = NOTE_TEXT_GRAY1_WIN;
-    pagelut.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    pagelut.lut  = bpp1_lut;
-    pagelut.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    olpc_data->disp = rt_display_init(&pagelut, RT_NULL, RT_NULL);
+    olpc_data->disp = rt_display_get_disp();
     RT_ASSERT(olpc_data->disp != RT_NULL);
+
+    ret = olpc_note_lutset(olpc_data);
+    RT_ASSERT(ret == RT_EOK);
 
 #if defined(RT_USING_TOUCH)
     olpc_note_touch_register(olpc_data);
@@ -836,7 +871,8 @@ static void olpc_note_thread(void *p)
 
     while (1)
     {
-        ret = rt_event_recv(olpc_data->disp_event, EVENT_NOTE_REFRESH | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
+        ret = rt_event_recv(olpc_data->disp_event,
+                            EVENT_NOTE_REFRESH | EVENT_NOTE_EXIT | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         if (ret != RT_EOK)
@@ -863,6 +899,10 @@ static void olpc_note_thread(void *p)
             RT_ASSERT(ret == RT_EOK);
         }
 #endif
+        if (event & EVENT_NOTE_EXIT)
+        {
+            break;
+        }
     }
 
     /* Thread deinit */
@@ -870,19 +910,23 @@ static void olpc_note_thread(void *p)
     rt_timer_stop(olpc_data->srctimer);
     ret = rt_timer_delete(olpc_data->srctimer);
     RT_ASSERT(ret == RT_EOK);
+    olpc_data->srctimer = RT_NULL;
 #endif
 
 #if defined(RT_USING_TOUCH)
     olpc_note_touch_unregister(olpc_data);
+    olpc_touch_list_clear();
 #endif
 
     olpc_note_deinit(olpc_data);
 
     rt_event_delete(olpc_data->disp_event);
-
-    rt_display_deinit(olpc_data->disp);
+    olpc_data->disp_event = RT_NULL;
 
     rt_free(olpc_data);
+    olpc_data = RT_NULL;
+
+    rt_event_send(olpc_main_event, EVENT_APP_CLOCK);
 }
 
 /**
@@ -896,12 +940,8 @@ int olpc_note_app_init(void)
     RT_ASSERT(rtt_note != RT_NULL);
     rt_thread_startup(rtt_note);
 
-#if defined(OLPC_APP_SRCSAVER_ENABLE)
-    olpc_srcprotect_app_init();
-#endif
-
     return RT_EOK;
 }
 
-INIT_APP_EXPORT(olpc_note_app_init);
+//INIT_APP_EXPORT(olpc_note_app_init);
 #endif

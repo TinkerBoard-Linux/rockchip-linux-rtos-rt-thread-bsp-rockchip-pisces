@@ -46,8 +46,9 @@ static uint32_t bpp1_lut[2] =
 
 /* Event define */
 #define EVENT_EBOOK_REFRESH     (0x01UL << 0)
-#define EVENT_SRCSAVER_ENTER    (0x01UL << 1)
-#define EVENT_SRCSAVER_EXIT     (0x01UL << 2)
+#define EVENT_EBOOK_EXIT        (0x01UL << 1)
+#define EVENT_SRCSAVER_ENTER    (0x01UL << 2)
+#define EVENT_SRCSAVER_EXIT     (0x01UL << 3)
 
 /* Command define */
 #define UPDATE_PAGE             (0x01UL << 0)
@@ -105,6 +106,26 @@ static image_info_t *ebook_pages_num[EBOOK_PAGE_MAX_NUM] =
  *
  **************************************************************************************************
  */
+
+/**
+ * olpc ebook lut set.
+ */
+static rt_err_t olpc_ebook_lutset(void *parameter)
+{
+    rt_err_t ret = RT_EOK;
+    struct rt_display_lut lut0;
+
+    lut0.winId = EBOOK_TEXT_GRAY1_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    lut0.lut  = bpp1_lut;
+    lut0.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
+
+    ret = rt_display_lutset(&lut0, RT_NULL, RT_NULL);
+    RT_ASSERT(ret == RT_EOK);
+
+    return ret;
+}
+
 /**
  * olpc ebook demo init.
  */
@@ -112,7 +133,6 @@ static rt_err_t olpc_ebook_init(struct olpc_ebook_data *olpc_data)
 {
     rt_err_t    ret;
     rt_device_t device = olpc_data->disp->device;
-    struct rt_display_config wincfg;
     struct rt_device_graphic_info info;
 
     olpc_data->page_num = 0;
@@ -125,25 +145,30 @@ static rt_err_t olpc_ebook_init(struct olpc_ebook_data *olpc_data)
     olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
     RT_ASSERT(olpc_data->fb != RT_NULL);
 
-    rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
+#if 0
+    {
+        struct rt_display_config wincfg;
+        rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
 
-    wincfg.winId = EBOOK_TEXT_GRAY1_WIN;
-    wincfg.fb    = olpc_data->fb;
-    wincfg.w     = 32;
-    wincfg.h     = WIN_LAYERS_H;
-    wincfg.fblen = wincfg.w * wincfg.h / 8;
-    wincfg.x     = 0;
-    wincfg.y     = 0;
-    wincfg.ylast = wincfg.y;
+        wincfg.winId = EBOOK_TEXT_GRAY1_WIN;
+        wincfg.fb    = olpc_data->fb;
+        wincfg.w     = 32;
+        wincfg.h     = WIN_LAYERS_H;
+        wincfg.fblen = wincfg.w * wincfg.h / 8;
+        wincfg.x     = 0;
+        wincfg.y     = 0;
+        wincfg.ylast = wincfg.y;
 
-    RT_ASSERT((wincfg.w % 4) == 0);
-    RT_ASSERT((wincfg.h % 2) == 0);
-    RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
+        RT_ASSERT((wincfg.w % 4) == 0);
+        RT_ASSERT((wincfg.h % 2) == 0);
+        RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
 
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+        rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
 
-    ret = rt_display_win_layers_set(&wincfg);
-    RT_ASSERT(ret == RT_EOK);
+        ret = rt_display_win_layers_set(&wincfg);
+        RT_ASSERT(ret == RT_EOK);
+    }
+#endif
 
     return RT_EOK;
 }
@@ -154,6 +179,7 @@ static rt_err_t olpc_ebook_init(struct olpc_ebook_data *olpc_data)
 static void olpc_ebook_deinit(struct olpc_ebook_data *olpc_data)
 {
     rt_free_large((void *)olpc_data->fb);
+    olpc_data->fb = RT_NULL;
 }
 
 /**
@@ -252,6 +278,11 @@ static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_
 
     switch (event)
     {
+    case TOUCH_EVENT_LONG_DOWN:
+        rt_kprintf("ebook long down!!\n");
+        rt_event_send(olpc_data->disp_event, EVENT_EBOOK_EXIT);
+        return RT_EOK;
+
     case TOUCH_EVENT_SHORT_DOWN:
         page_bl_flag = 0;
         down_point.x = point->x;
@@ -355,7 +386,10 @@ static rt_err_t olpc_ebook_screen_touch_callback(rt_int32_t touch_id, enum olpc_
     }
 
 #if defined(OLPC_APP_SRCSAVER_ENABLE)
-    rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
+    if ((olpc_data) && (olpc_data->srctimer))
+    {
+        rt_timer_start(olpc_data->srctimer);    //reset screen protection timer
+    }
 #endif
 
     return ret;
@@ -432,10 +466,11 @@ static rt_err_t olpc_ebook_screen_protection_enter(void *parameter)
 
 #if defined(RT_USING_TOUCH)
     olpc_ebook_screen_touch_unregister(parameter);
+    olpc_touch_list_clear();
 #endif
 
     // register exit hook & start screen protection
-    olpc_srcprotect_app_start(olpc_ebook_screen_protection_hook, parameter);
+    olpc_srcprotect_app_init(olpc_ebook_screen_protection_hook, parameter);
 
     return RT_EOK;
 }
@@ -446,6 +481,8 @@ static rt_err_t olpc_ebook_screen_protection_enter(void *parameter)
 static rt_err_t olpc_ebook_screen_protection_exit(void *parameter)
 {
     struct olpc_ebook_data *olpc_data = (struct olpc_ebook_data *)parameter;
+
+    olpc_ebook_lutset(olpc_data);   // reset lut
 
 #if defined(RT_USING_TOUCH)
     olpc_ebook_screen_touch_register(parameter);
@@ -476,19 +513,16 @@ static void olpc_ebook_thread(void *p)
     rt_err_t ret;
     uint32_t event;
     struct olpc_ebook_data *olpc_data;
-    struct rt_display_lut pagelut;
 
     olpc_data = (struct olpc_ebook_data *)rt_malloc(sizeof(struct olpc_ebook_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_ebook_data));
 
-    pagelut.winId = EBOOK_TEXT_GRAY1_WIN;
-    pagelut.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    pagelut.lut  = bpp1_lut;
-    pagelut.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    olpc_data->disp = rt_display_init(&pagelut, RT_NULL, RT_NULL);
+    olpc_data->disp = rt_display_get_disp();
     RT_ASSERT(olpc_data->disp != RT_NULL);
+
+    ret = olpc_ebook_lutset(olpc_data);
+    RT_ASSERT(ret == RT_EOK);
 
 #if defined(RT_USING_TOUCH)
     olpc_ebook_screen_touch_register(olpc_data);
@@ -515,7 +549,8 @@ static void olpc_ebook_thread(void *p)
 
     while (1)
     {
-        ret = rt_event_recv(olpc_data->disp_event, EVENT_EBOOK_REFRESH | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
+        ret = rt_event_recv(olpc_data->disp_event,
+                            EVENT_EBOOK_REFRESH | EVENT_EBOOK_EXIT | EVENT_SRCSAVER_ENTER | EVENT_SRCSAVER_EXIT,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         if (ret != RT_EOK)
@@ -542,26 +577,34 @@ static void olpc_ebook_thread(void *p)
             RT_ASSERT(ret == RT_EOK);
         }
 #endif
+        if (event & EVENT_EBOOK_EXIT)
+        {
+            break;
+        }
     }
 
     /* Thread deinit */
 #if defined(OLPC_APP_SRCSAVER_ENABLE)
     rt_timer_stop(olpc_data->srctimer);
     ret = rt_timer_delete(olpc_data->srctimer);
+    olpc_data->srctimer = RT_NULL;
     RT_ASSERT(ret == RT_EOK);
 #endif
 
 #if defined(RT_USING_TOUCH)
     olpc_ebook_screen_touch_unregister(olpc_data);
+    olpc_touch_list_clear();
 #endif
 
     olpc_ebook_deinit(olpc_data);
 
     rt_event_delete(olpc_data->disp_event);
-
-    rt_display_deinit(olpc_data->disp);
+    olpc_data->disp_event = RT_NULL;
 
     rt_free(olpc_data);
+    olpc_data = RT_NULL;
+
+    rt_event_send(olpc_main_event, EVENT_APP_CLOCK);
 }
 
 /**
@@ -575,12 +618,8 @@ int olpc_ebook_app_init(void)
     RT_ASSERT(rtt_ebook != RT_NULL);
     rt_thread_startup(rtt_ebook);
 
-#if defined(OLPC_APP_SRCSAVER_ENABLE)
-    olpc_srcprotect_app_init();
-#endif
-
     return RT_EOK;
 }
 
-INIT_APP_EXPORT(olpc_ebook_app_init);
+//INIT_APP_EXPORT(olpc_ebook_app_init);
 #endif
