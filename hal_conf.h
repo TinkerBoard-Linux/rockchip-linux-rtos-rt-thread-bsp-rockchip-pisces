@@ -14,6 +14,18 @@
 
 #define SYS_TIMER TIMER5 /* System timer designation (RK TIMER) */
 
+#ifdef RT_USING_SYSTICK
+#define TICK_IRQn  SysTick_IRQn
+#else
+#define TICK_TIMER TIMER4
+#define TICK_IRQn  TIMER4_IRQn
+#endif
+
+#ifdef RT_USING_PM_TIMER
+#define PM_TIMER TIMER3
+#define PM_TIMER_IRQn TIMER3_IRQn
+#endif
+
 #define HAL_DBG_USING_RTT_SERIAL 1   /* redirect the hal log to rtt console */
 
 #ifdef RT_USING_ACDCDIG

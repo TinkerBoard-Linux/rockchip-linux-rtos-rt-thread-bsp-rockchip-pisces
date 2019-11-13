@@ -39,13 +39,6 @@
 #include "drv_pm.h"
 #endif
 
-#ifdef RT_USING_SYSTICK
-#define TICK_IRQn  SysTick_IRQn
-#else
-#define TICK_TIMER TIMER4
-#define TICK_IRQn  TIMER4_IRQn
-#endif
-
 #ifdef RT_USING_CRU
 static const struct clk_init clk_inits[] =
 {
