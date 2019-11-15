@@ -431,6 +431,8 @@ void rt_hw_board_init()
     HAL_PD_Off(PD_AUDIO);
 #endif
 
+    rk_rt_pm_init();
+
     /* Initial usart deriver, and set console device */
 #ifdef RT_USING_UART
     rt_hw_usart_init();
