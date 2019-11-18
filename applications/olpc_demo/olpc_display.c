@@ -891,7 +891,7 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_ENABLE, NULL);
     RT_ASSERT(ret == RT_EOK);
 
     /* post scale set */
@@ -992,7 +992,7 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
         cfg = cfg->next;
     }
 
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_DISABLE, NULL);
     RT_ASSERT(ret == RT_EOK);
 
     return ret;
@@ -1008,13 +1008,13 @@ rt_err_t rt_display_win_backlight_set(rt_uint16_t val)
     rt_device_t device = disp_data->device;
     rt_uint16_t blval  = val;
 
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWERON, NULL);
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_ENABLE, NULL);
     RT_ASSERT(ret == RT_EOK);
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_UPDATE_BL, &blval);
     RT_ASSERT(ret == RT_EOK);
 
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_POWEROFF, NULL);
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_DISABLE, NULL);
     RT_ASSERT(ret == RT_EOK);
 
     return ret;
@@ -1174,6 +1174,9 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     RT_ASSERT(ret == RT_EOK);
 
     ret = rt_device_control(device, RK_DISPLAY_CTRL_ENABLE, NULL);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_device_control(device, RK_DISPLAY_CTRL_AP_COP_MODE, (uint8_t *)1);
     RT_ASSERT(ret == RT_EOK);
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
