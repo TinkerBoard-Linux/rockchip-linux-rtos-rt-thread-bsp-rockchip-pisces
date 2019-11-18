@@ -754,6 +754,28 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
             ret = rt_display_decompress(&info, fb, xVir, xoffset, yoffset);
             RT_ASSERT(ret == RT_EOK);
         }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY16)
+        {
+            image_info_t info;
+            rt_memcpy(&info, img_info, sizeof(image_info_t));
+            info.x  /= 2;
+            info.w  /= 2;
+            xVir    /= 2;
+            xoffset /= 2;
+            ret = rt_display_decompress(&info, fb, xVir, xoffset, yoffset);
+            RT_ASSERT(ret == RT_EOK);
+        }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY4)
+        {
+            image_info_t info;
+            rt_memcpy(&info, img_info, sizeof(image_info_t));
+            info.x  /= 4;
+            info.w  /= 4;
+            xVir    /= 4;
+            xoffset /= 4;
+            ret = rt_display_decompress(&info, fb, xVir, xoffset, yoffset);
+            RT_ASSERT(ret == RT_EOK);
+        }
         else //if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY1)
         {
             ret = jbig2_decompression(img_info, fb, xVir, xoffset, yoffset);
@@ -841,6 +863,82 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
 
                         fb[y * (xVir / 8) + x / 8] &= ~(0x80 >> (x % 8));
                         fb[y * (xVir / 8) + x / 8] |= bitval >> (x % 8);
+                    }
+                }
+            }
+        }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY4)
+        {
+            RT_ASSERT((xVir % 4) == 0);
+
+            if ((xoffset % 4) == 0)
+            {
+                for (y = yoffset; y < yoffset + img_info->h; y++)
+                {
+                    i = (y - yoffset) * ((img_info->w + 3) / 4);
+                    for (x = xoffset / 4; x < (xoffset + img_info->w) / 4; x++)
+                    {
+                        fb[y * (xVir / 4) + x] = img_info->data[i++];
+                    }
+
+                    if (((xoffset + img_info->w) % 4) != 0)
+                    {
+                        rt_uint8_t maskval = 0xff >> (img_info->w % 4);
+                        fb[y * (xVir / 4) + x] &= maskval;
+                        fb[y * (xVir / 4) + x] |= (img_info->data[i++] & (~maskval));
+                    }
+                }
+            }
+            else
+            {
+                for (y = yoffset; y < yoffset + img_info->h; y++)
+                {
+                    i = (y - yoffset) * ((img_info->w + 3) / 4) * 4;
+                    for (x = xoffset; x < xoffset + img_info->w; x++)
+                    {
+                        bitval = (img_info->data[i / 4] << (i % 4)) & 0xc0;
+                        i++;
+
+                        fb[y * (xVir / 4) + x / 4] &= ~(0xc0 >> (x % 4));
+                        fb[y * (xVir / 4) + x / 4] |= bitval >> (x % 4);
+                    }
+                }
+            }
+        }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY16)
+        {
+            RT_ASSERT((xVir % 2) == 0);
+
+            if ((xoffset % 2) == 0)
+            {
+                for (y = yoffset; y < yoffset + img_info->h; y++)
+                {
+                    i = (y - yoffset) * ((img_info->w + 1) / 2);
+                    for (x = xoffset / 2; x < (xoffset + img_info->w) / 2; x++)
+                    {
+                        fb[y * (xVir / 2) + x] = img_info->data[i++];
+                    }
+
+                    if (((xoffset + img_info->w) % 2) != 0)
+                    {
+                        rt_uint8_t maskval = 0xff >> (img_info->w % 2);
+                        fb[y * (xVir / 2) + x] &= maskval;
+                        fb[y * (xVir / 2) + x] |= (img_info->data[i++] & (~maskval));
+                    }
+                }
+            }
+            else
+            {
+                for (y = yoffset; y < yoffset + img_info->h; y++)
+                {
+                    i = (y - yoffset) * ((img_info->w + 1) / 2) * 2;
+                    for (x = xoffset; x < xoffset + img_info->w; x++)
+                    {
+                        bitval = (img_info->data[i / 2] << (i % 2)) & 0xf0;
+                        i++;
+
+                        fb[y * (xVir / 2) + x / 2] &= ~(0xf0 >> (x % 2));
+                        fb[y * (xVir / 2) + x / 2] |= bitval >> (x % 2);
                     }
                 }
             }
