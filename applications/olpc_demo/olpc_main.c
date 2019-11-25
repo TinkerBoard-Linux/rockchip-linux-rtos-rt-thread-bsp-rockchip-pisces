@@ -157,7 +157,7 @@ static void olpc_main_thread(void *p)
     while (1)
     {
         ret = rt_event_recv(olpc_main_event,
-                            EVENT_APP_CLOCK | EVENT_APP_EBOOK | EVENT_APP_BLOCK | EVENT_APP_SNAKE | EVENT_APP_NOTE,
+                            EVENT_APP_CLOCK | EVENT_APP_EBOOK | EVENT_APP_BLOCK | EVENT_APP_SNAKE | EVENT_APP_NOTE | EVENT_APP_XSCREEN,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         RT_ASSERT(ret == RT_EOK);
@@ -194,11 +194,19 @@ static void olpc_main_thread(void *p)
             RT_ASSERT(ret == RT_EOK);
 #endif
         }
-        else /*if (event & EVENT_APP_NOTE)*/
+        else if (event & EVENT_APP_NOTE)
         {
 #if defined(OLPC_APP_NOTE_ENABLE)
             olpc_firmware_request(SEGMENT_ID_OLPC_NOTE);
             ret = olpc_note_app_init();
+            RT_ASSERT(ret == RT_EOK);
+#endif
+        }
+        else /*if (event & EVENT_APP_XSCREEN)*/
+        {
+#if defined(OLPC_APP_XSCREEN_ENABLE)
+            olpc_firmware_request(SEGMENT_ID_OLPC_XSCREEN);
+            ret = olpc_xscreen_app_init();
             RT_ASSERT(ret == RT_EOK);
 #endif
         }

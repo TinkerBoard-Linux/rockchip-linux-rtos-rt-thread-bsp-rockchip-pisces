@@ -115,6 +115,95 @@ extern rt_uint32_t __olpnote_data_len;
 extern rt_uint32_t __olpnote_bss_vma;
 extern rt_uint32_t __olpnote_bss_len;
 
+extern rt_uint32_t __olpxscreen_text_lma;
+extern rt_uint32_t __olpxscreen_text_vma;
+extern rt_uint32_t __olpxscreen_text_len;
+extern rt_uint32_t __olpxscreen_data_lma;
+extern rt_uint32_t __olpxscreen_data_vma;
+extern rt_uint32_t __olpxscreen_data_len;
+extern rt_uint32_t __olpxscreen_bss_vma;
+extern rt_uint32_t __olpxscreen_bss_len;
+
+extern rt_uint32_t __olpxscreen00_res_lma;
+extern rt_uint32_t __olpxscreen00_res_vma;
+extern rt_uint32_t __olpxscreen00_res_len;
+
+extern rt_uint32_t __olpxscreen01_res_lma;
+extern rt_uint32_t __olpxscreen01_res_vma;
+extern rt_uint32_t __olpxscreen01_res_len;
+
+extern rt_uint32_t __olpxscreen02_res_lma;
+extern rt_uint32_t __olpxscreen02_res_vma;
+extern rt_uint32_t __olpxscreen02_res_len;
+
+extern rt_uint32_t __olpxscreen03_res_lma;
+extern rt_uint32_t __olpxscreen03_res_vma;
+extern rt_uint32_t __olpxscreen03_res_len;
+
+extern rt_uint32_t __olpxscreen04_res_lma;
+extern rt_uint32_t __olpxscreen04_res_vma;
+extern rt_uint32_t __olpxscreen04_res_len;
+
+extern rt_uint32_t __olpxscreen05_res_lma;
+extern rt_uint32_t __olpxscreen05_res_vma;
+extern rt_uint32_t __olpxscreen05_res_len;
+
+extern rt_uint32_t __olpxscreen06_res_lma;
+extern rt_uint32_t __olpxscreen06_res_vma;
+extern rt_uint32_t __olpxscreen06_res_len;
+
+extern rt_uint32_t __olpxscreen07_res_lma;
+extern rt_uint32_t __olpxscreen07_res_vma;
+extern rt_uint32_t __olpxscreen07_res_len;
+
+extern rt_uint32_t __olpxscreen08_res_lma;
+extern rt_uint32_t __olpxscreen08_res_vma;
+extern rt_uint32_t __olpxscreen08_res_len;
+
+extern rt_uint32_t __olpxscreen09_res_lma;
+extern rt_uint32_t __olpxscreen09_res_vma;
+extern rt_uint32_t __olpxscreen09_res_len;
+
+extern rt_uint32_t __olpxscreen10_res_lma;
+extern rt_uint32_t __olpxscreen10_res_vma;
+extern rt_uint32_t __olpxscreen10_res_len;
+
+extern rt_uint32_t __olpxscreen11_res_lma;
+extern rt_uint32_t __olpxscreen11_res_vma;
+extern rt_uint32_t __olpxscreen11_res_len;
+
+extern rt_uint32_t __olpxscreen12_res_lma;
+extern rt_uint32_t __olpxscreen12_res_vma;
+extern rt_uint32_t __olpxscreen12_res_len;
+
+extern rt_uint32_t __olpxscreen13_res_lma;
+extern rt_uint32_t __olpxscreen13_res_vma;
+extern rt_uint32_t __olpxscreen13_res_len;
+
+extern rt_uint32_t __olpxscreen14_res_lma;
+extern rt_uint32_t __olpxscreen14_res_vma;
+extern rt_uint32_t __olpxscreen14_res_len;
+
+extern rt_uint32_t __olpxscreen15_res_lma;
+extern rt_uint32_t __olpxscreen15_res_vma;
+extern rt_uint32_t __olpxscreen15_res_len;
+
+extern rt_uint32_t __olpxscreen16_res_lma;
+extern rt_uint32_t __olpxscreen16_res_vma;
+extern rt_uint32_t __olpxscreen16_res_len;
+
+extern rt_uint32_t __olpxscreen17_res_lma;
+extern rt_uint32_t __olpxscreen17_res_vma;
+extern rt_uint32_t __olpxscreen17_res_len;
+
+extern rt_uint32_t __olpxscreen18_res_lma;
+extern rt_uint32_t __olpxscreen18_res_vma;
+extern rt_uint32_t __olpxscreen18_res_len;
+
+extern rt_uint32_t __olpxscreen19_res_lma;
+extern rt_uint32_t __olpxscreen19_res_vma;
+extern rt_uint32_t __olpxscreen19_res_len;
+
 __attribute__((section("_FirmwareTable_")))
 FIRMWARE_INFO_T const FirmwareInfo  =
 {
@@ -268,6 +357,342 @@ FIRMWARE_INFO_T const FirmwareInfo  =
                 &__olpnote_bss_len,
 
                 "OLPC_NOTE",        // string len must < 16
+            },
+
+            // .olpc_xscreen
+            {
+                &__olpxscreen_text_lma,
+                &__olpxscreen_text_vma,
+                &__olpxscreen_text_len,
+
+                &__olpxscreen_data_lma,
+                &__olpxscreen_data_vma,
+                &__olpxscreen_data_len,
+
+                &__olpxscreen_bss_vma,
+                &__olpxscreen_bss_len,
+
+                "OLPC_XSCREEN",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 00
+            {
+                &__olpxscreen00_res_lma,
+                &__olpxscreen00_res_vma,
+                &__olpxscreen00_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES00",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 01
+            {
+                &__olpxscreen01_res_lma,
+                &__olpxscreen01_res_vma,
+                &__olpxscreen01_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES01",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 02
+            {
+                &__olpxscreen02_res_lma,
+                &__olpxscreen02_res_vma,
+                &__olpxscreen02_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES02",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 03
+            {
+                &__olpxscreen03_res_lma,
+                &__olpxscreen03_res_vma,
+                &__olpxscreen03_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES03",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 04
+            {
+                &__olpxscreen04_res_lma,
+                &__olpxscreen04_res_vma,
+                &__olpxscreen04_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES04",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 05
+            {
+                &__olpxscreen05_res_lma,
+                &__olpxscreen05_res_vma,
+                &__olpxscreen05_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES05",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 06
+            {
+                &__olpxscreen06_res_lma,
+                &__olpxscreen06_res_vma,
+                &__olpxscreen06_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES06",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 07
+            {
+                &__olpxscreen07_res_lma,
+                &__olpxscreen07_res_vma,
+                &__olpxscreen07_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES07",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 08
+            {
+                &__olpxscreen08_res_lma,
+                &__olpxscreen08_res_vma,
+                &__olpxscreen08_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES08",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 09
+            {
+                &__olpxscreen09_res_lma,
+                &__olpxscreen09_res_vma,
+                &__olpxscreen09_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES09",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 10
+            {
+                &__olpxscreen10_res_lma,
+                &__olpxscreen10_res_vma,
+                &__olpxscreen10_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES10",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 11
+            {
+                &__olpxscreen11_res_lma,
+                &__olpxscreen11_res_vma,
+                &__olpxscreen11_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES11",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 12
+            {
+                &__olpxscreen12_res_lma,
+                &__olpxscreen12_res_vma,
+                &__olpxscreen12_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES12",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 13
+            {
+                &__olpxscreen13_res_lma,
+                &__olpxscreen13_res_vma,
+                &__olpxscreen13_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES13",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 14
+            {
+                &__olpxscreen14_res_lma,
+                &__olpxscreen14_res_vma,
+                &__olpxscreen14_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES14",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 15
+            {
+                &__olpxscreen15_res_lma,
+                &__olpxscreen15_res_vma,
+                &__olpxscreen15_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES15",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 16
+            {
+                &__olpxscreen16_res_lma,
+                &__olpxscreen16_res_vma,
+                &__olpxscreen16_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES16",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 17
+            {
+                &__olpxscreen17_res_lma,
+                &__olpxscreen17_res_vma,
+                &__olpxscreen17_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES17",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 18
+            {
+                &__olpxscreen18_res_lma,
+                &__olpxscreen18_res_vma,
+                &__olpxscreen18_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES18",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 19
+            {
+                &__olpxscreen19_res_lma,
+                &__olpxscreen19_res_vma,
+                &__olpxscreen19_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES19",        // string len must < 16
             },
         },
     },
@@ -426,6 +851,342 @@ FIRMWARE_INFO_T const FirmwareInfoCopy  =
                 &__olpnote_bss_len,
 
                 "OLPC_NOTE",        // string len must < 16
+            },
+
+            // .olpc_xscreen
+            {
+                &__olpxscreen_text_lma,
+                &__olpxscreen_text_vma,
+                &__olpxscreen_text_len,
+
+                &__olpxscreen_data_lma,
+                &__olpxscreen_data_vma,
+                &__olpxscreen_data_len,
+
+                &__olpxscreen_bss_vma,
+                &__olpxscreen_bss_len,
+
+                "OLPC_XSCREEN",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 00
+            {
+                &__olpxscreen00_res_lma,
+                &__olpxscreen00_res_vma,
+                &__olpxscreen00_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES00",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 01
+            {
+                &__olpxscreen01_res_lma,
+                &__olpxscreen01_res_vma,
+                &__olpxscreen01_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES01",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 02
+            {
+                &__olpxscreen02_res_lma,
+                &__olpxscreen02_res_vma,
+                &__olpxscreen02_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES02",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 03
+            {
+                &__olpxscreen03_res_lma,
+                &__olpxscreen03_res_vma,
+                &__olpxscreen03_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES03",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 04
+            {
+                &__olpxscreen04_res_lma,
+                &__olpxscreen04_res_vma,
+                &__olpxscreen04_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES04",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 05
+            {
+                &__olpxscreen05_res_lma,
+                &__olpxscreen05_res_vma,
+                &__olpxscreen05_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES05",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 06
+            {
+                &__olpxscreen06_res_lma,
+                &__olpxscreen06_res_vma,
+                &__olpxscreen06_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES06",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 07
+            {
+                &__olpxscreen07_res_lma,
+                &__olpxscreen07_res_vma,
+                &__olpxscreen07_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES07",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 08
+            {
+                &__olpxscreen08_res_lma,
+                &__olpxscreen08_res_vma,
+                &__olpxscreen08_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES08",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 09
+            {
+                &__olpxscreen09_res_lma,
+                &__olpxscreen09_res_vma,
+                &__olpxscreen09_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES09",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 10
+            {
+                &__olpxscreen10_res_lma,
+                &__olpxscreen10_res_vma,
+                &__olpxscreen10_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES10",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 11
+            {
+                &__olpxscreen11_res_lma,
+                &__olpxscreen11_res_vma,
+                &__olpxscreen11_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES11",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 12
+            {
+                &__olpxscreen12_res_lma,
+                &__olpxscreen12_res_vma,
+                &__olpxscreen12_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES12",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 13
+            {
+                &__olpxscreen13_res_lma,
+                &__olpxscreen13_res_vma,
+                &__olpxscreen13_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES13",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 14
+            {
+                &__olpxscreen14_res_lma,
+                &__olpxscreen14_res_vma,
+                &__olpxscreen14_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES14",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 15
+            {
+                &__olpxscreen15_res_lma,
+                &__olpxscreen15_res_vma,
+                &__olpxscreen15_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES15",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 16
+            {
+                &__olpxscreen16_res_lma,
+                &__olpxscreen16_res_vma,
+                &__olpxscreen16_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES16",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 17
+            {
+                &__olpxscreen17_res_lma,
+                &__olpxscreen17_res_vma,
+                &__olpxscreen17_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES17",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 18
+            {
+                &__olpxscreen18_res_lma,
+                &__olpxscreen18_res_vma,
+                &__olpxscreen18_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES18",        // string len must < 16
+            },
+
+            // .olpc_xscreen res 19
+            {
+                &__olpxscreen19_res_lma,
+                &__olpxscreen19_res_vma,
+                &__olpxscreen19_res_len,
+
+                0,
+                0,
+                0,
+
+                0,
+                0,
+
+                "XSCREEN_RES19",        // string len must < 16
             },
         },
     },

@@ -40,11 +40,12 @@
 #define WSCALE              (WIN_SCALED_W / WIN_LAYERS_W)
 #define HSCALE              (WIN_SCALED_H / WIN_LAYERS_H)
 
-#define EVENT_APP_CLOCK  (0x01UL << 0)
-#define EVENT_APP_EBOOK  (0x01UL << 1)
-#define EVENT_APP_BLOCK  (0x01UL << 2)
-#define EVENT_APP_SNAKE  (0x01UL << 3)
-#define EVENT_APP_NOTE   (0x01UL << 4)
+#define EVENT_APP_CLOCK     (0x01UL << 0)
+#define EVENT_APP_EBOOK     (0x01UL << 1)
+#define EVENT_APP_BLOCK     (0x01UL << 2)
+#define EVENT_APP_SNAKE     (0x01UL << 3)
+#define EVENT_APP_NOTE      (0x01UL << 4)
+#define EVENT_APP_XSCREEN   (0x01UL << 5)
 
 /**
  * Global data struct for olpc display demo
@@ -182,6 +183,8 @@ void rt_display_deinit(rt_display_data_t disp_data);
  */
 rt_uint16_t rt_display_get_bl_max(rt_device_t device);
 
+void olpc_firmware_request(rt_uint32_t id);
+
 /**
  * olpc clock demo application init.
  */
@@ -206,6 +209,11 @@ int olpc_note_app_init(void);
  * olpc snake demo application init.
  */
 int olpc_snake_app_init(void);
+
+/**
+ * olpc xscreen demo application init.
+ */
+int olpc_xscreen_app_init(void);
 
 /**
  * screen protection API.

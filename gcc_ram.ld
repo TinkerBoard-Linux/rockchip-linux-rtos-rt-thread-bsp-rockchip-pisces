@@ -193,9 +193,264 @@ SECTIONS
     __olpnote_text_len = SIZEOF(.olpc_note_text);
     __olpapps_text_len  = MAX(__olpapps_text_len, __olpnote_text_len);
 
+    /* olpc xscreen */
+    __olpxscreen_text_lma = __olpnote_text_lma + __olpnote_text_len;
+    __olpxscreen_text_vma = __olpapps_text_vma;
+    .olpc_xscreen_text (__olpxscreen_text_vma) : AT (__olpxscreen_text_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/olpc_xscreen.o(.text*)
+        */olpc_demo/resource/x_screen*_*_*.o(.text*)
+
+        */olpc_demo/olpc_xscreen.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen_text_len = SIZEOF(.olpc_xscreen_text);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len);
+
+    /* olpc xscreen : resource pic00*/
+    __olpxscreen00_res_lma = __olpxscreen_text_lma + __olpxscreen_text_len;
+    __olpxscreen00_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen00_res (__olpxscreen00_res_vma) : AT (__olpxscreen00_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen00_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen00_res_len = SIZEOF(.olpc_xscreen00_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen00_res_len);
+
+    /* olpc xscreen : resource pic01*/
+    __olpxscreen01_res_lma = __olpxscreen00_res_lma + __olpxscreen00_res_len;
+    __olpxscreen01_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen01_res (__olpxscreen01_res_vma) : AT (__olpxscreen01_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen01_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen01_res_len = SIZEOF(.olpc_xscreen01_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen01_res_len);
+
+    /* olpc xscreen : resource pic02*/
+    __olpxscreen02_res_lma = __olpxscreen01_res_lma + __olpxscreen01_res_len;
+    __olpxscreen02_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen02_res (__olpxscreen02_res_vma) : AT (__olpxscreen02_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen02_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen02_res_len = SIZEOF(.olpc_xscreen02_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen02_res_len);
+
+    /* olpc xscreen : resource pic03*/
+    __olpxscreen03_res_lma = __olpxscreen02_res_lma + __olpxscreen02_res_len;
+    __olpxscreen03_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen03_res (__olpxscreen03_res_vma) : AT (__olpxscreen03_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen03_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen03_res_len = SIZEOF(.olpc_xscreen03_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen03_res_len);
+
+    /* olpc xscreen : resource pic04*/
+    __olpxscreen04_res_lma = __olpxscreen03_res_lma + __olpxscreen03_res_len;
+    __olpxscreen04_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen04_res (__olpxscreen04_res_vma) : AT (__olpxscreen04_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen04_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen04_res_len = SIZEOF(.olpc_xscreen04_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen04_res_len);
+
+    /* olpc xscreen : resource pic05*/
+    __olpxscreen05_res_lma = __olpxscreen04_res_lma + __olpxscreen04_res_len;
+    __olpxscreen05_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen05_res (__olpxscreen05_res_vma) : AT (__olpxscreen05_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen05_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen05_res_len = SIZEOF(.olpc_xscreen05_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen05_res_len);
+
+    /* olpc xscreen : resource pic06*/
+    __olpxscreen06_res_lma = __olpxscreen05_res_lma + __olpxscreen05_res_len;
+    __olpxscreen06_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen06_res (__olpxscreen06_res_vma) : AT (__olpxscreen06_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen06_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen06_res_len = SIZEOF(.olpc_xscreen06_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen06_res_len);
+
+    /* olpc xscreen : resource pic07*/
+    __olpxscreen07_res_lma = __olpxscreen06_res_lma + __olpxscreen06_res_len;
+    __olpxscreen07_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen07_res (__olpxscreen07_res_vma) : AT (__olpxscreen07_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen07_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen07_res_len = SIZEOF(.olpc_xscreen07_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen07_res_len);
+
+    /* olpc xscreen : resource pic08*/
+    __olpxscreen08_res_lma = __olpxscreen07_res_lma + __olpxscreen07_res_len;
+    __olpxscreen08_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen08_res (__olpxscreen08_res_vma) : AT (__olpxscreen08_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen08_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen08_res_len = SIZEOF(.olpc_xscreen08_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen08_res_len);
+
+    /* olpc xscreen : resource pic09*/
+    __olpxscreen09_res_lma = __olpxscreen08_res_lma + __olpxscreen08_res_len;
+    __olpxscreen09_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen09_res (__olpxscreen09_res_vma) : AT (__olpxscreen09_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen09_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen09_res_len = SIZEOF(.olpc_xscreen09_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen09_res_len);
+
+    /* olpc xscreen : resource pic10*/
+    __olpxscreen10_res_lma = __olpxscreen09_res_lma + __olpxscreen09_res_len;
+    __olpxscreen10_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen10_res (__olpxscreen10_res_vma) : AT (__olpxscreen10_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen10_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen10_res_len = SIZEOF(.olpc_xscreen10_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen10_res_len);
+
+    /* olpc xscreen : resource pic11*/
+    __olpxscreen11_res_lma = __olpxscreen10_res_lma + __olpxscreen10_res_len;
+    __olpxscreen11_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen11_res (__olpxscreen11_res_vma) : AT (__olpxscreen11_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen11_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen11_res_len = SIZEOF(.olpc_xscreen11_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen11_res_len);
+
+    /* olpc xscreen : resource pic12*/
+    __olpxscreen12_res_lma = __olpxscreen11_res_lma + __olpxscreen11_res_len;
+    __olpxscreen12_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen12_res (__olpxscreen12_res_vma) : AT (__olpxscreen12_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen12_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen12_res_len = SIZEOF(.olpc_xscreen12_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen12_res_len);
+
+    /* olpc xscreen : resource pic13*/
+    __olpxscreen13_res_lma = __olpxscreen12_res_lma + __olpxscreen12_res_len;
+    __olpxscreen13_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen13_res (__olpxscreen13_res_vma) : AT (__olpxscreen13_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen13_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen13_res_len = SIZEOF(.olpc_xscreen13_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen13_res_len);
+
+    /* olpc xscreen : resource pic14*/
+    __olpxscreen14_res_lma = __olpxscreen13_res_lma + __olpxscreen13_res_len;
+    __olpxscreen14_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen14_res (__olpxscreen14_res_vma) : AT (__olpxscreen14_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen14_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen14_res_len = SIZEOF(.olpc_xscreen14_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen14_res_len);
+
+    /* olpc xscreen : resource pic15*/
+    __olpxscreen15_res_lma = __olpxscreen14_res_lma + __olpxscreen14_res_len;
+    __olpxscreen15_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen15_res (__olpxscreen15_res_vma) : AT (__olpxscreen15_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen15_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen15_res_len = SIZEOF(.olpc_xscreen15_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen15_res_len);
+
+    /* olpc xscreen : resource pic16*/
+    __olpxscreen16_res_lma = __olpxscreen15_res_lma + __olpxscreen15_res_len;
+    __olpxscreen16_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen16_res (__olpxscreen16_res_vma) : AT (__olpxscreen16_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen16_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen16_res_len = SIZEOF(.olpc_xscreen16_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen16_res_len);
+
+    /* olpc xscreen : resource pic17*/
+    __olpxscreen17_res_lma = __olpxscreen16_res_lma + __olpxscreen16_res_len;
+    __olpxscreen17_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen17_res (__olpxscreen17_res_vma) : AT (__olpxscreen17_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen17_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen17_res_len = SIZEOF(.olpc_xscreen17_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen17_res_len);
+
+    /* olpc xscreen : resource pic18*/
+    __olpxscreen18_res_lma = __olpxscreen17_res_lma + __olpxscreen17_res_len;
+    __olpxscreen18_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen18_res (__olpxscreen18_res_vma) : AT (__olpxscreen18_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen18_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen18_res_len = SIZEOF(.olpc_xscreen18_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen18_res_len);
+
+    /* olpc xscreen : resource pic19*/
+    __olpxscreen19_res_lma = __olpxscreen18_res_lma + __olpxscreen18_res_len;
+    __olpxscreen19_res_vma = __olpxscreen_text_vma + __olpxscreen_text_len;
+    .olpc_xscreen19_res (__olpxscreen19_res_vma) : AT (__olpxscreen19_res_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/resource/x_screen19_*_*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olpxscreen19_res_len = SIZEOF(.olpc_xscreen19_res);
+    __olpapps_text_len    = MAX(__olpapps_text_len, __olpxscreen_text_len + __olpxscreen19_res_len);
+
     /*********************************************************************/
     /* remaining code */
-    __text_ext_lma = __olpnote_text_lma + __olpnote_text_len;
+    __text_ext_lma = __olpxscreen19_res_lma + __olpxscreen19_res_len;
     __text_ext_vma = __olpapps_text_vma + __olpapps_text_len;
     .text_ext (__text_ext_vma) : AT (__text_ext_lma)
     {
@@ -387,9 +642,23 @@ SECTIONS
     __olpnote_data_len = SIZEOF(.olpc_note_data);
     __olpapps_data_len  = MAX(__olpapps_data_len, __olpnote_data_len);
 
+
+    /* olpc xscreen */
+    __olpxscreen_data_lma = __olpnote_data_lma + __olpnote_data_len;
+    __olpxscreen_data_vma = __olpapps_data_vma;
+    .olpc_xscreen_data (__olpxscreen_data_vma) : AT (__olpxscreen_data_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/olpc_xscreen.o(.data*)
+        */olpc_demo/resource/x_screen*_*_*.o(.data*)
+        . = ALIGN(32);
+    }
+    __olpxscreen_data_len = SIZEOF(.olpc_xscreen_data);
+    __olpapps_data_len    = MAX(__olpapps_data_len, __olpxscreen_data_len);
+
     /*********************************************************************/
     /* remaining data */
-    __data_ext_lma = __olpnote_data_lma + __olpnote_data_len;
+    __data_ext_lma = __olpxscreen_data_lma + __olpxscreen_data_len;
     __data_ext_vma = __olpapps_data_vma + __olpapps_data_len;
     .data_ext (__data_ext_vma) : AT (__data_ext_lma)
     {
@@ -478,6 +747,19 @@ SECTIONS
     }
     __olpnote_bss_len = SIZEOF(.olpc_note_bss);
     __olpapps_bss_len  = MAX(__olpapps_bss_len, __olpnote_bss_len);
+
+    /* olpc xscreen */
+    . = __olpapps_bss_vma;
+    __olpxscreen_bss_vma = .;
+    .olpc_xscreen_bss (NOLOAD):
+    {
+        . = ALIGN(32);
+        */olpc_demo/olpc_xscreen.o(.bss*)
+        */olpc_demo/resource/x_screen*_*_*.o(.bss*)
+        . = ALIGN(32);
+    }
+    __olpxscreen_bss_len = SIZEOF(.olpc_xscreen_bss);
+    __olpapps_bss_len    = MAX(__olpapps_bss_len, __olpxscreen_bss_len);
 
     /*********************************************************************/
     /* bss & remain region */

@@ -2347,7 +2347,13 @@ static rt_err_t olpc_clock_home_touch_callback(rt_int32_t touch_id, enum olpc_to
         rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
 
         rt_thread_delay(10);
-        if (olpc_data->home_id == 3)
+        if (olpc_data->home_id == 2)
+        {
+#if defined(OLPC_APP_XSCREEN_ENABLE)
+            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //xscreen
+#endif
+        }
+        else if (olpc_data->home_id == 3)
         {
 #if defined(OLPC_APP_NOTE_ENABLE)
             rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //note
@@ -2640,7 +2646,13 @@ static void olpc_clock_thread(void *p)
     rt_free(olpc_data);
     olpc_data = RT_NULL;
 
-    if (home_id == 3)
+    if (home_id == 2)
+    {
+#if defined(OLPC_APP_XSCREEN_ENABLE)
+        rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
+#endif
+    }
+    else if (home_id == 3)
     {
 #if defined(OLPC_APP_NOTE_ENABLE)
         rt_event_send(olpc_main_event, EVENT_APP_NOTE);
