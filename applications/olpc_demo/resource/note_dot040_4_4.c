@@ -8,21 +8,21 @@
 #if defined(OLPC_APP_NOTE_ENABLE)
 #include "image_info.h"
 
-static const unsigned char note_dot_8_8[8UL] =
+static const unsigned char note_dot040_4_4[4UL] =
 {
-    0x3C, 0x7E, 0xFF, 0xFF, 0xFF, 0xFF, 0x7E, 0x3C
+    0x60, 0xF0, 0xF0, 0x60
 };
 
-image_info_t note_dot_info =
+image_info_t note_dot040_info =
 {
     .type  = IMG_TYPE_RAW,
     .pixel = RTGRAPHIC_PIXEL_FORMAT_GRAY1,
     .x = 0,
     .y = 0,
-    .w = 8,
-    .h = 8,
-    .size = 8UL,
-    .data = note_dot_8_8,
+    .w = 4,
+    .h = 4,
+    .size = 4UL,
+    .data = note_dot040_4_4,
     .colorkey = COLOR_KEY_EN | 0,
 };
 

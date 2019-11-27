@@ -810,28 +810,14 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
 
             rt_uint8_t colorkey = (rt_uint8_t)(img_info->colorkey & 0xff);
 
-            if ((xoffset % 8) == 0)
+            if (((xoffset % 8) == 0) && ((img_info->colorkey & COLOR_KEY_EN) == 0))
             {
                 for (y = yoffset; y < yoffset + img_info->h; y++)
                 {
                     i = (y - yoffset) * ((img_info->w + 7) / 8);
                     for (x = xoffset / 8; x < (xoffset + img_info->w) / 8; x++)
                     {
-                        if (img_info->colorkey & COLOR_KEY_EN)
-                        {
-                            if (colorkey)
-                            {
-                                fb[y * (xVir / 8) + x] &= img_info->data[i++];
-                            }
-                            else
-                            {
-                                fb[y * (xVir / 8) + x] |= img_info->data[i++];
-                            }
-                        }
-                        else
-                        {
-                            fb[y * (xVir / 8) + x] = img_info->data[i++];
-                        }
+                        fb[y * (xVir / 8) + x] = img_info->data[i++];
                     }
 
                     if (((xoffset + img_info->w) % 8) != 0)
