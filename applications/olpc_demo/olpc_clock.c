@@ -592,7 +592,7 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 
     olpc_data->cmd = UPDATE_CLOCK | UPDATE_MSG;
 
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
     olpc_data->lampfblen = LAMP_FB_W * LAMP_FB_H;
     olpc_data->lampfb    = (rt_uint8_t *)rt_malloc_large(olpc_data->lampfblen);
     RT_ASSERT(olpc_data->lampfb != RT_NULL);
