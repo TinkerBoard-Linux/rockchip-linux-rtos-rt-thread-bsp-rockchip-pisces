@@ -1352,7 +1352,7 @@ rt_err_t rt_display_lutset(struct rt_display_lut *lutA,
 
     if ((lutC != RT_NULL) && (lutC->size != 0))
     {
-        rt_display_win_clear(lutC->winId, lutC->format, 0, 0, 0);
+        rt_display_win_clear(lutC->winId, lutC->format, 0, 2, 0);
     }
 
     return RT_EOK;
