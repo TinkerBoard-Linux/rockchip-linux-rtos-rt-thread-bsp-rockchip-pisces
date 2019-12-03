@@ -321,6 +321,18 @@ static rt_err_t olpc_note_lutset(void *parameter)
     ret = rt_display_lutset(&lut0, &lut1, RT_NULL);
     RT_ASSERT(ret == RT_EOK);
 
+    // clear screen
+    {
+        struct olpc_note_data *olpc_data = (struct olpc_note_data *)parameter;
+        rt_device_t device = olpc_data->disp->device;
+        struct rt_device_graphic_info info;
+
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+        RT_ASSERT(ret == RT_EOK);
+
+        rt_display_win_clear(NOTE_CTRL_RGB332_WIN, RTGRAPHIC_PIXEL_FORMAT_RGB332, 0, WIN_LAYERS_H, 0);
+    }
+
     return ret;
 }
 
@@ -360,29 +372,6 @@ static rt_err_t olpc_note_init(struct olpc_note_data *olpc_data)
     olpc_data->ctrlfb    = (rt_uint8_t *)rt_malloc_large(olpc_data->ctrlfblen);
     RT_ASSERT(olpc_data->ctrlfb != RT_NULL);
     rt_memset((void *)olpc_data->ctrlfb, 0x00, olpc_data->ctrlfblen);
-
-#if 0
-    {
-        struct rt_display_config wincfg;
-        rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-
-        wincfg.winId = NOTE_TEXT_GRAY1_WIN;
-        wincfg.fb    = olpc_data->fb;
-        wincfg.w     = 32;
-        wincfg.h     = WIN_LAYERS_H;
-        wincfg.fblen = wincfg.w * wincfg.h / 8;
-        wincfg.x     = 0;
-        wincfg.y     = 0;
-        wincfg.ylast = wincfg.y;
-
-        RT_ASSERT((wincfg.w % 4) == 0);
-        RT_ASSERT((wincfg.h % 2) == 0);
-        RT_ASSERT((wincfg.fblen) <= olpc_data->fblen);
-
-        ret = rt_display_win_layers_set(&wincfg);
-        RT_ASSERT(ret == RT_EOK);
-    }
-#endif
 
     return RT_EOK;
 }

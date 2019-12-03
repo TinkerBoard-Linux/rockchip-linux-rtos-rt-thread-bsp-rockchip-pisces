@@ -140,6 +140,18 @@ static rt_err_t olpc_xscreen_lutset(void *parameter)
     ret = rt_display_lutset(&lut0, RT_NULL, RT_NULL);
     RT_ASSERT(ret == RT_EOK);
 
+    // clear screen
+    {
+        struct olpc_xscreen_data *olpc_data = (struct olpc_xscreen_data *)parameter;
+        rt_device_t device = olpc_data->disp->device;
+        struct rt_device_graphic_info info;
+
+        ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+        RT_ASSERT(ret == RT_EOK);
+
+        rt_display_win_clear(XSCREEN_RGB332_WIN, RTGRAPHIC_PIXEL_FORMAT_RGB332, 0, WIN_LAYERS_H, 0);
+    }
+
     return ret;
 }
 

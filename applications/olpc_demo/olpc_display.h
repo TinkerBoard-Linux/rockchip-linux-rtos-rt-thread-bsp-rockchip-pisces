@@ -158,6 +158,12 @@ rt_err_t rt_display_update_hook(rt_device_t device, uint8_t winid);
 /**
  * Display lut set.
  */
+rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt,
+                              rt_uint16_t y, rt_uint16_t h, rt_uint8_t data);
+
+/**
+ * Display lut set.
+ */
 rt_err_t rt_display_lutset(struct rt_display_lut *lutA,
                            struct rt_display_lut *lutB,
                            struct rt_display_lut *lutC);

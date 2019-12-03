@@ -1224,26 +1224,25 @@ rt_uint16_t rt_display_get_bl_max(rt_device_t device)
 /**
  * Display lut set.
  */
-rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt)
+rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt,
+                              rt_uint16_t y, rt_uint16_t h, rt_uint8_t data)
 {
     rt_err_t ret;
     struct rt_display_config wincfg;
-    struct rt_device_graphic_info info;
-    rt_device_t device = g_disp_data->device;
     rt_uint8_t fmt2bps[8] = {0, 1, 2, 4, 8, 8, 16, 16};
 
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
+    RT_ASSERT((y % 2) == 0);
+    RT_ASSERT((h % 2) == 0);
 
     rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
     wincfg.winId = winid;
     wincfg.x     = 0;
-    wincfg.y     = 0;
+    wincfg.y     = y;
     wincfg.w     = MAX(32 / fmt2bps[fmt], 1);
-    wincfg.h     = WIN_LAYERS_H;
+    wincfg.h     = h;
     wincfg.fblen = wincfg.w * wincfg.h * fmt2bps[fmt] / 8;
     wincfg.fb    = (rt_uint8_t *)rt_malloc_large(wincfg.fblen);
-    rt_memset((void *)wincfg.fb, 0x00, wincfg.fblen);
+    rt_memset((void *)wincfg.fb, data, wincfg.fblen);
 
     ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);
@@ -1270,21 +1269,21 @@ rt_err_t rt_display_lutset(struct rt_display_lut *lutA,
     {
         disp_data->lut[lutA->winId].lut    = RT_NULL;
         disp_data->lut[lutA->winId].format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-        rt_display_win_clear(lutA->winId, RTGRAPHIC_PIXEL_FORMAT_RGB565);
+        rt_display_win_clear(lutA->winId, RTGRAPHIC_PIXEL_FORMAT_RGB565, 0, 2, 0);
     }
 
     if ((lutB != RT_NULL) && (lutB->size != 0))
     {
         disp_data->lut[lutB->winId].lut    = RT_NULL;
         disp_data->lut[lutB->winId].format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-        rt_display_win_clear(lutB->winId, RTGRAPHIC_PIXEL_FORMAT_RGB565);
+        rt_display_win_clear(lutB->winId, RTGRAPHIC_PIXEL_FORMAT_RGB565, 0, 2, 0);
     }
 
     if ((lutC != RT_NULL) && (lutC->size != 0))
     {
         disp_data->lut[lutC->winId].lut    = RT_NULL;
         disp_data->lut[lutC->winId].format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-        rt_display_win_clear(lutC->winId, RTGRAPHIC_PIXEL_FORMAT_RGB565);
+        rt_display_win_clear(lutC->winId, RTGRAPHIC_PIXEL_FORMAT_RGB565, 0, 2, 0);
     }
 
     // set new lut......
@@ -1343,17 +1342,17 @@ rt_err_t rt_display_lutset(struct rt_display_lut *lutA,
     // enable new lut and refresh frame
     if ((lutA != RT_NULL) && (lutA->size != 0))
     {
-        rt_display_win_clear(lutA->winId, lutA->format);
+        rt_display_win_clear(lutA->winId, lutA->format, 0, 2, 0);
     }
 
     if ((lutB != RT_NULL) && (lutB->size != 0))
     {
-        rt_display_win_clear(lutB->winId, lutB->format);
+        rt_display_win_clear(lutB->winId, lutB->format, 0, 2, 0);
     }
 
     if ((lutC != RT_NULL) && (lutC->size != 0))
     {
-        rt_display_win_clear(lutC->winId, lutC->format);
+        rt_display_win_clear(lutC->winId, lutC->format, 0, 0, 0);
     }
 
     return RT_EOK;
