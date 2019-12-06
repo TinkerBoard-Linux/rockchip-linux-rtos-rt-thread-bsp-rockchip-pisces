@@ -158,12 +158,11 @@ static rt_err_t olpc_xscreen_lutset(void *parameter)
 /**
  * olpc xscreen demo init.
  */
-extern FIRMWARE_INFO_T const FirmwareInfoCopy;
 static rt_err_t olpc_xscreen_init(struct olpc_xscreen_data *olpc_data)
 {
     rt_err_t    ret;
+    rt_uint32_t i;
     rt_device_t device = olpc_data->disp->device;
-    rt_uint32_t i, id, addr, len;
     struct rt_device_graphic_info info;
 
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
@@ -173,15 +172,39 @@ static rt_err_t olpc_xscreen_init(struct olpc_xscreen_data *olpc_data)
     olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
     RT_ASSERT(olpc_data->fb != RT_NULL);
 
-    for (i = 0; i < XSCREEN_PIC_MAX_NUM; i++)
+    // load x-screen resource to memory
     {
-        id   = i + SEGMENT_ID_OLPC_XSCREEN_RES00;
-        len  = (rt_uint32_t)FirmwareInfoCopy.SegmentInfo.Segment[id].CodeImageLength;
-        addr = (rt_uint32_t)FirmwareInfoCopy.SegmentInfo.Segment[id].CodeImageBase;
-        olpc_firmware_request(id);
-        xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_malloc_dtcm(len);
-        RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
-        rt_memcpy((rt_uint8_t *)xscreen_pages_num[i]->data, (rt_uint8_t *)addr, len);
+        FIRMWARE_REQ_PARAM  Param;
+        FIRMWARE_REQ_PARAM *pParam = &Param;
+
+        rt_memset(pParam, 0, sizeof(FIRMWARE_REQ_PARAM));
+        for (i = 0; i < XSCREEN_PIC_MAX_NUM; i++)
+        {
+            pParam->id   = i + SEGMENT_ID_OLPC_XSCREEN_RES00;
+            pParam->type = SEGMENT_TEXT;
+#if 0
+            {
+                olpc_firmware_content_request(pParam);
+
+                xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_dma_malloc_dtcm((rt_uint32_t)pParam->info.CodeImageLength);
+                RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
+
+                rt_memcpy((rt_uint8_t *)xscreen_pages_num[i]->data,
+                          (rt_uint8_t *)pParam->info.CodeImageBase,
+                          (rt_uint32_t)pParam->info.CodeImageLength);
+            }
+#else
+            {
+                olpc_firmware_info_request(pParam);
+
+                xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_dma_malloc_dtcm((rt_uint32_t)pParam->info.CodeImageLength);
+                RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
+
+                pParam->buf = (rt_uint8_t *)xscreen_pages_num[i]->data;
+                olpc_firmware_content_request(pParam);
+            }
+#endif
+        }
     }
 
     return RT_EOK;
@@ -196,7 +219,7 @@ static void olpc_xscreen_deinit(struct olpc_xscreen_data *olpc_data)
 
     for (i = 0; i < XSCREEN_PIC_MAX_NUM; i++)
     {
-        rt_free_dtcm((rt_uint8_t *)xscreen_pages_num[i]->data);
+        rt_dma_free_dtcm((rt_uint8_t *)xscreen_pages_num[i]->data);
         xscreen_pages_num[i]->data = RT_NULL;
     }
 

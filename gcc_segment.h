@@ -6,6 +6,8 @@
 #ifndef _SEGMENT_INTO_H_
 #define _SEGMENT_INTO_H_
 
+#include "hal_def.h"
+
 /**
  * segment ID
  */
@@ -84,5 +86,31 @@ typedef struct _FIRMWARE_INFO_T
     SEGMENT_INFO_TABLE     SegmentInfo;
 
 } FIRMWARE_INFO_T;
+
+/**
+ * firmware request type define
+ */
+#define SEGMENT_TEXT   (0x01UL << 0)
+#define SEGMENT_DATA   (0x01UL << 1)
+#define SEGMENT_BSS    (0x01UL << 2)
+#define SEGMENT_ALL    (SEGMENT_TEXT | SEGMENT_DATA | SEGMENT_BSS)
+
+/**
+ * firmware request param
+ */
+typedef struct _FIRMWARE_REQ_PARAM
+{
+    /* request param*/
+    rt_uint32_t id;             /* id */
+    rt_uint32_t type;           /* type: text, data, bss */
+
+    rt_uint8_t  *buf;           /* buffer address, load firmware data to a buffer*/
+    rt_uint32_t offset;         /* if buffer used, offset is used */
+    rt_uint32_t reqlen;         /* if buffer used, request len is used */
+
+    /* return param*/
+    SEGMENT_INFO_T info;        /* segment info returned */
+
+} HAL_CACHELINE_ALIGNED FIRMWARE_REQ_PARAM;
 
 #endif /* _SEGMENT_INTO_H_ */
