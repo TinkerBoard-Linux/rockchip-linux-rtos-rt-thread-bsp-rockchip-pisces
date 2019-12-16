@@ -59,11 +59,13 @@ rt_event_t olpc_main_event;
  *
  **************************************************************************************************
  */
+
 /**
  * Get firmware segment info.
  */
 rt_err_t olpc_firmware_info_request(FIRMWARE_REQ_PARAM *param)
 {
+#ifdef OLPC_OVERLAY_ENABLE
     struct MBOX_CMD_DAT cmdData;
     struct MBOX_REG *pReg;
     uint32_t intc1;
@@ -118,6 +120,8 @@ rt_err_t olpc_firmware_info_request(FIRMWARE_REQ_PARAM *param)
                param->info.Name);
 #endif
 
+#endif //OLPC_OVERLAY_ENABLE
+
     return RT_EOK;
 }
 
@@ -126,6 +130,7 @@ rt_err_t olpc_firmware_info_request(FIRMWARE_REQ_PARAM *param)
  */
 rt_err_t olpc_firmware_content_request(FIRMWARE_REQ_PARAM *param)
 {
+#ifdef OLPC_OVERLAY_ENABLE
     struct MBOX_CMD_DAT cmdData;
     struct MBOX_REG *pReg;
     uint32_t intc1;
@@ -224,6 +229,8 @@ rt_err_t olpc_firmware_content_request(FIRMWARE_REQ_PARAM *param)
                param->info.Name);
 #endif
 
+#endif //OLPC_OVERLAY_ENABLE
+
     return RT_EOK;
 }
 
@@ -232,6 +239,7 @@ rt_err_t olpc_firmware_content_request(FIRMWARE_REQ_PARAM *param)
  */
 rt_err_t olpc_firmware_request(rt_uint32_t id)
 {
+#ifdef OLPC_OVERLAY_ENABLE
     FIRMWARE_REQ_PARAM  Param;
     FIRMWARE_REQ_PARAM *pParam = &Param;
 
@@ -240,6 +248,8 @@ rt_err_t olpc_firmware_request(rt_uint32_t id)
     pParam->id   = id;
     pParam->type = SEGMENT_ALL;
     olpc_firmware_content_request(pParam);
+
+#endif //OLPC_OVERLAY_ENABLE
 
     return RT_EOK;
 }
@@ -285,7 +295,19 @@ static void olpc_main_thread(void *p)
     olpc_main_event = rt_event_create("olpcmain_event", RT_IPC_FLAG_FIFO);
     RT_ASSERT(olpc_main_event != RT_NULL);
 
+#if defined(OLPC_APP_CLOCK_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_CLOCK);
+#elif defined(OLPC_APP_EBOOK_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_EBOOK);
+#elif defined(OLPC_APP_BLOCK_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_BLOCK);
+#elif defined(OLPC_APP_SNAKE_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_SNAKE);
+#elif defined(OLPC_APP_NOTE_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_NOTE);
+#elif defined(OLPC_APP_XSCREEN_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
+#endif
 
     while (1)
     {

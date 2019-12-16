@@ -28,7 +28,7 @@ extern int Image$$RW_RAM$$ZI$$Limit;
 #else
 extern int __heap_start__;
 #define RK_SRAM_BEGIN    (&__heap_start__)
-#ifdef RT_USING_LARGE_HEAP
+#ifdef RT_LARGE_HEAP_SIZE
 extern int __large_start__, __large_end__;
 #define RK_LARGE_BEGIN   (&__large_start__)
 #define RK_LARGE_END     (&__large_end__)
@@ -43,6 +43,8 @@ extern int __large_start__, __large_end__;
 * Return         : None
 *******************************************************************************/
 #include "gcc_segment.h"
+
+#ifdef OLPC_OVERLAY_ENABLE
 
 extern rt_uint32_t __firmware_lma;
 
@@ -697,6 +699,7 @@ FIRMWARE_INFO_T const FirmwareInfo  =
         },
     },
 };
+#endif
 
 /*******************************************************************************
 * Function Name  : assert_failed
@@ -757,7 +760,7 @@ void rtthread_startup(void)
     rt_uncache_heap_init((void *)RK_UNCACHE_HEAP_START, (void *)RK_SRAM_END);
 #endif
 
-#ifdef RT_USING_LARGE_HEAP
+#ifdef RT_LARGE_HEAP_SIZE
     rt_large_heap_init((void *)RK_LARGE_BEGIN, (void *)RK_LARGE_END);
 #endif
 

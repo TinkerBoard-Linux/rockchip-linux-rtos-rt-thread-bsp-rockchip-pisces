@@ -5,6 +5,10 @@ menuconfig RT_USING_OLPC_DEMO
     default n
 
 if RT_USING_OLPC_DEMO
+    config OLPC_OVERLAY_ENABLE
+        bool "olpc overlay enable"
+        default n
+
     config OLPC_APP_SRCSAVER_ENABLE
         bool "olpc screen saver enable"
         default n
@@ -53,7 +57,7 @@ if RT_USING_OLPC_DEMO
 
     config OLPC_APP_XSCREEN_ENABLE
         bool "olpc x-screen demo select"
-        depends on RT_USING_DTCM_HEAP
+        depends on RT_USING_DTCM_HEAP && OLPC_OVERLAY_ENABLE
         default n
 endif
 

@@ -29,9 +29,10 @@
  *   __stack
  */
 
+#include "rtconfig.h"
+
 ENTRY(Reset_Handler)
 _ram_fs_size = 0x10000;
-_large_heap_size = 0x80000;
 _system_stack_size = 0x400;
 _code_start_addr = 0x04000000;
 _data_start_off  = 0x1c000000;
@@ -793,14 +794,18 @@ SECTIONS
     }*/
 
     /* region for large memory allocate */
+#ifdef RT_LARGE_HEAP_SIZE
     .large (COPY):
     {
         . = ALIGN(32);
         __large_start__ = .;
-        . = . + _large_heap_size;
+        . = . + RT_LARGE_HEAP_SIZE;
         . = ALIGN(32);
         __large_end__ = .;
     }
+#endif
+
+    /* address for stack */
     _stack_start_addr = .;
 
     /* region for dtcm memory allocate */

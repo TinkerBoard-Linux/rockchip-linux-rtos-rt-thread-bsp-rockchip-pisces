@@ -54,9 +54,11 @@ if PLATFORM == 'gcc':
     if XIP == 'enable':
         AFLAGS += '-D__STARTUP_COPY_MULTIPLE '
         CFLAGS += '-D__STARTUP_COPY_MULTIPLE '
-        LFLAGS += '-T gcc_xip.ld'
+        LINK_SCRIPT = 'gcc_xip.ld'
     else:
-        LFLAGS += '-T gcc_ram.ld'
+        LINK_SCRIPT = 'gcc_ram.ld'
+
+    LFLAGS += '-T %s' % LINK_SCRIPT
 
     if BUILD == 'debug':
         CFLAGS += ' -O0 -gdwarf-2'
