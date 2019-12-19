@@ -42,6 +42,7 @@ if PLATFORM == 'gcc':
     SIZE = PREFIX + 'size'
     OBJDUMP = PREFIX + 'objdump'
     OBJCPY = PREFIX + 'objcopy'
+    STRIP = PREFIX + 'strip'
 
     DEVICE = ' -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections'
     CFLAGS = DEVICE + ' -g -Wall -Werror=maybe-uninitialized -Werror=implicit-function-declaration -Werror=return-type -Werror=address -Werror=int-to-pointer-cast -Werror=pointer-to-int-cast '
@@ -69,7 +70,8 @@ if PLATFORM == 'gcc':
     POST_ACTION = OBJCPY + ' -O binary $TARGET rtthread.bin\n' + SIZE + ' $TARGET \n'
 
     M_CFLAGS = CFLAGS + ' -mlong-calls  -Dsourcerygxx -O0 -fPIC '
-    M_LFLAGS = DEVICE + ' -Wl,-z,max-page-size=0x4 -shared -fPIC -e main -nostdlib'
+    M_LFLAGS = DEVICE + ' -Wl,--gc-sections,-z,max-page-size=0x4 -shared -fPIC -e main -nostartfiles -nostdlib -static-libgcc'
+    M_POST_ACTION = STRIP + ' -R .hash $TARGET\n' + SIZE + ' $TARGET \n'
 
 elif PLATFORM == 'armcc':
     # toolchains

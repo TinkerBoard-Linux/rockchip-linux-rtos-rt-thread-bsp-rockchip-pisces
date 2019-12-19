@@ -153,7 +153,7 @@ static void mpu_init(void)
         },
         {
             .RBAR = ARM_MPU_RBAR(1U, 0x20000000U),
-            .RASR = ARM_MPU_RASR(1U, ARM_MPU_AP_FULL, 0U, 0U, 1U, 0U, 0U, ARM_MPU_REGION_SIZE_1MB)
+            .RASR = ARM_MPU_RASR(0U, ARM_MPU_AP_FULL, 0U, 0U, 1U, 0U, 0U, ARM_MPU_REGION_SIZE_1MB)
         },
         {
             .RBAR = ARM_MPU_RBAR(2U, 0x40000000U),
