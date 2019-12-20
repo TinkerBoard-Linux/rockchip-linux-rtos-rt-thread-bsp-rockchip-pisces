@@ -10,7 +10,7 @@
 #include "drv_heap.h"
 #include "image_info.h"
 #include "olpc_display.h"
-#include "gcc_segment.h"
+#include "olpc_ap.h"
 
 #if defined(RT_USING_TOUCH)
 #include "drv_touch.h"
@@ -195,13 +195,15 @@ static rt_err_t olpc_xscreen_init(struct olpc_xscreen_data *olpc_data)
             }
 #else
             {
-                olpc_firmware_info_request(pParam);
+                ret = olpc_ap_command(FIRMWARE_INFO_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
+                RT_ASSERT(ret == RT_EOK);
 
                 xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_dma_malloc_dtcm((rt_uint32_t)pParam->info.CodeImageLength);
                 RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
 
                 pParam->buf = (rt_uint8_t *)xscreen_pages_num[i]->data;
-                olpc_firmware_content_request(pParam);
+                ret = olpc_ap_command(FIRMWARE_DOWNLOAD_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
+                RT_ASSERT(ret == RT_EOK);
             }
 #endif
         }

@@ -9,8 +9,8 @@
 
 #include "drv_heap.h"
 #include "image_info.h"
-#include "gcc_segment.h"
 #include "olpc_display.h"
+#include "olpc_ap.h"
 
 #if defined(RT_USING_TOUCH)
 #include "drv_touch.h"
@@ -37,12 +37,6 @@ static uint32_t bpp1_lut[2] =
 #define CLOCK_RGB332_WIN    1
 #define CLOCK_RGB565_WIN    2
 
-#define FIRMWARE_INFO_REQ       0x494E464FU //"INFO"
-#define FIRMWARE_DOWNLOAD_REQ   0x46524551U //"FREQ"
-#define FIRMWARE_DOWNLOAD_ACK   0x4641434BU //"FACK"
-#define FIRMWARE_DOWNLOAD_OK    0x0U
-#define FIRMWARE_DOWNLOAD_ERROR 0x1U
-
 /*
  **************************************************************************************************
  *
@@ -55,214 +49,38 @@ rt_event_t olpc_main_event;
 /*
  **************************************************************************************************
  *
- * Global static struct & data define
+ * olpc static functions
  *
  **************************************************************************************************
  */
 
 /**
- * Get firmware segment info.
- */
-rt_err_t olpc_firmware_info_request(FIRMWARE_REQ_PARAM *param)
-{
-#ifdef OLPC_OVERLAY_ENABLE
-    struct MBOX_CMD_DAT cmdData;
-    struct MBOX_REG *pReg;
-    uint32_t intc1;
-
-    RT_ASSERT(param);
-    RT_ASSERT(param->id < SEGMENT_ID_MAX);
-
-    intc1 = INTC1_BASE;
-    *(uint32_t *)intc1 = 0x10;
-
-    pReg = (struct MBOX_REG *)MBOX1_BASE;
-    pReg->B2A_STATUS  = 1;
-    pReg->B2A_INTEN  |= 1;
-    pReg->A2B[0].CMD  = 0;
-    pReg->A2B[0].DATA = 0;
-
-    // send request & wait load
-    cmdData.DATA = (rt_uint32_t)param;
-    cmdData.CMD  = FIRMWARE_INFO_REQ;
-
-    HAL_DCACHE_CleanByRange((rt_uint32_t)param, sizeof(FIRMWARE_REQ_PARAM));
-
-    HAL_MBOX_SendMsg2(pReg, 0, &cmdData, 0);
-    do
-    {
-        rt_thread_delay(1);
-        HAL_MBOX_RecvMsg(pReg, 0);
-    }
-    while (pReg->A2B[0].CMD != FIRMWARE_DOWNLOAD_ACK);
-
-    // clear register
-    pReg->B2A[0].CMD  = 0;
-    pReg->B2A[0].DATA = 0;
-
-    HAL_DCACHE_InvalidateByRange((rt_uint32_t)param, sizeof(FIRMWARE_REQ_PARAM));
-
-#if 0
-    rt_kprintf("%d code lma = 0x%08x, vma = 0x%08x, size = 0x%08x, %s\n", param->id,
-               param->info.CodeLoadBase,
-               param->info.CodeImageBase,
-               param->info.CodeImageLength,
-               param->info.Name);
-    rt_kprintf("%d data lma = 0x%08x, vma = 0x%08x, size = 0x%08x, %s\n", param->id,
-               param->info.DataLoadBase,
-               param->info.DataImageBase,
-               param->info.DataImageLength,
-               param->info.Name);
-    rt_kprintf("%d  bss lma = 0x%08x, vma = 0x%08x, size = 0x%08x, %s\n", param->id,
-               0,
-               param->info.BssImageBase,
-               param->info.BssImageLength,
-               param->info.Name);
-#endif
-
-#endif //OLPC_OVERLAY_ENABLE
-
-    return RT_EOK;
-}
-
-/**
- * Get firmware segment data by param.
- */
-rt_err_t olpc_firmware_content_request(FIRMWARE_REQ_PARAM *param)
-{
-#ifdef OLPC_OVERLAY_ENABLE
-    struct MBOX_CMD_DAT cmdData;
-    struct MBOX_REG *pReg;
-    uint32_t intc1;
-
-    RT_ASSERT(param);
-    RT_ASSERT(param->id < SEGMENT_ID_MAX);
-    RT_ASSERT((param->type & SEGMENT_ALL) != 0);
-    if (param->buf)
-    {
-        /* only one type can use buffer mode */
-        RT_ASSERT(param->type != SEGMENT_ALL);
-        RT_ASSERT(param->type != (SEGMENT_TEXT | SEGMENT_DATA));
-        RT_ASSERT(param->type != (SEGMENT_TEXT | SEGMENT_BSS));
-        RT_ASSERT(param->type != (SEGMENT_DATA | SEGMENT_BSS));
-
-        /* buffer and len must align CACHE_LINE_SIZE */
-        RT_ASSERT((rt_uint32_t)param->buf % CACHE_LINE_SIZE == 0);
-        RT_ASSERT((rt_uint32_t)param->reqlen % CACHE_LINE_SIZE == 0);
-    }
-
-    intc1 = INTC1_BASE;
-    *(uint32_t *)intc1 = 0x10;
-
-    pReg = (struct MBOX_REG *)MBOX1_BASE;
-    pReg->B2A_STATUS  = 1;
-    pReg->B2A_INTEN  |= 1;
-    pReg->A2B[0].CMD  = 0;
-    pReg->A2B[0].DATA = 0;
-
-    // send request & wait load
-    cmdData.DATA = (rt_uint32_t)param;
-    cmdData.CMD  = FIRMWARE_DOWNLOAD_REQ;
-
-    HAL_DCACHE_CleanByRange((rt_uint32_t)param, sizeof(FIRMWARE_REQ_PARAM));
-
-    HAL_MBOX_SendMsg2(pReg, 0, &cmdData, 0);
-    do
-    {
-        rt_thread_delay(1);
-        HAL_MBOX_RecvMsg(pReg, 0);
-    }
-    while (pReg->A2B[0].CMD != FIRMWARE_DOWNLOAD_ACK);
-
-    // clear register
-    pReg->B2A[0].CMD  = 0;
-    pReg->B2A[0].DATA = 0;
-
-    HAL_DCACHE_InvalidateByRange((rt_uint32_t)param, sizeof(FIRMWARE_REQ_PARAM));
-
-    // invalidate cache
-    if (param->buf == RT_NULL)
-    {
-        if (param->info.CodeImageLength)
-        {
-            HAL_ICACHE_InvalidateByRange((rt_uint32_t)param->info.CodeImageBase,
-                                         (rt_uint32_t)param->info.CodeImageLength);
-        }
-        if (param->info.DataImageLength)
-        {
-            HAL_DCACHE_InvalidateByRange((rt_uint32_t)param->info.DataImageBase,
-                                         (rt_uint32_t)param->info.DataImageLength);
-        }
-        if (param->info.BssImageLength)
-        {
-            HAL_DCACHE_InvalidateByRange((rt_uint32_t)param->info.BssImageBase,
-                                         (rt_uint32_t)param->info.BssImageLength);
-        }
-    }
-    else
-    {
-        if ((SRAM_IADDR_START <= (rt_uint32_t)param->buf) && ((rt_uint32_t)param->buf < SRAM_IADDR_START + SRAM_SIZE))
-        {
-            HAL_ICACHE_InvalidateByRange((rt_uint32_t)param->buf, param->reqlen);
-        }
-        else
-        {
-            HAL_DCACHE_InvalidateByRange((rt_uint32_t)param->buf, param->reqlen);
-        }
-    }
-
-#if 0
-    rt_kprintf("%d code lma = 0x%08x, vma = 0x%08x, size = 0x%08x, %s\n", param->id,
-               param->info.CodeLoadBase,
-               param->info.CodeImageBase,
-               param->info.CodeImageLength,
-               param->info.Name);
-    rt_kprintf("%d data lma = 0x%08x, vma = 0x%08x, size = 0x%08x, %s\n", param->id,
-               param->info.DataLoadBase,
-               param->info.DataImageBase,
-               param->info.DataImageLength,
-               param->info.Name);
-    rt_kprintf("%d  bss lma = 0x%08x, vma = 0x%08x, size = 0x%08x, %s\n", param->id,
-               0,
-               param->info.BssImageBase,
-               param->info.BssImageLength,
-               param->info.Name);
-#endif
-
-#endif //OLPC_OVERLAY_ENABLE
-
-    return RT_EOK;
-}
-
-/**
  * Get firmware segment data by id.
  */
-rt_err_t olpc_firmware_request(rt_uint32_t id)
+static rt_err_t olpc_firmware_request(rt_uint32_t id)
 {
 #ifdef OLPC_OVERLAY_ENABLE
     FIRMWARE_REQ_PARAM  Param;
     FIRMWARE_REQ_PARAM *pParam = &Param;
 
     rt_memset(pParam, 0, sizeof(FIRMWARE_REQ_PARAM));
-
     pParam->id   = id;
     pParam->type = SEGMENT_ALL;
-    olpc_firmware_content_request(pParam);
-
-#endif //OLPC_OVERLAY_ENABLE
-
+    olpc_ap_command(FIRMWARE_DOWNLOAD_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
+#endif
     return RT_EOK;
 }
 
 /*
  **************************************************************************************************
  *
- * olpc clock demo init & thread
+ * olpc main thread
  *
  **************************************************************************************************
  */
+
 /**
- * olpc clock dmeo thread.
+ * olpc main thread.
  */
 static void olpc_main_thread(void *p)
 {

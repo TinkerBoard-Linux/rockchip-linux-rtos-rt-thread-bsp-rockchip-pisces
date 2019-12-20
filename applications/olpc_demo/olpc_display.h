@@ -19,7 +19,6 @@
 #include <rtthread.h>
 #include "color_palette.h"
 #include "drv_display.h"
-#include "gcc_segment.h"
 
 /* Macro define */
 #define MIN(X, Y)           ((X)<(Y)?(X):(Y))
@@ -189,21 +188,6 @@ void rt_display_deinit(rt_display_data_t disp_data);
  * Get MAX value of backlight.
  */
 rt_uint16_t rt_display_get_bl_max(rt_device_t device);
-
-/**
- * Get firmware segment info.
- */
-rt_err_t olpc_firmware_info_request(FIRMWARE_REQ_PARAM *param);
-
-/**
- * Get firmware segment data by param.
- */
-rt_err_t olpc_firmware_content_request(FIRMWARE_REQ_PARAM *param);
-
-/**
- * Get firmware segment data by id.
- */
-rt_err_t olpc_firmware_request(rt_uint32_t id);
 
 /**
  * olpc clock demo application init.
