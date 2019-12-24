@@ -12,13 +12,15 @@
 #include "gcc_segment.h"
 
 /* AP command */
-#define FIRMWARE_INFO_REQ       0x494E464FU //"INFO"
-#define FIRMWARE_DOWNLOAD_REQ   0x46524551U //"FREQ"
+#define FIRMWARE_INFO_REQ       0x41500000U //"AP"00
+#define FIRMWARE_DOWNLOAD_REQ   0x41500001U //"AP"01
+#define FILE_INFO_REQ           0x41500002U //"AP"02
+#define FIILE_READ_REQ          0x41500003U //"AP"03
 
 /* AP return status */
-#define FIRMWARE_DOWNLOAD_ACK   0x4641434BU //"FACK"
-#define FIRMWARE_DOWNLOAD_OK    0x0U
-#define FIRMWARE_DOWNLOAD_ERROR 0x1U
+#define AP_COMMAND_ACK          0x4141434BU //"AACK"
+#define AP_STATUS_OK            0x0U
+#define AP_STATUS_ERROR         0x1U
 
 /**
  * firmware request param
@@ -37,6 +39,24 @@ typedef struct _FIRMWARE_REQ_PARAM
     SEGMENT_INFO_T info;        /* segment info returned */
 
 } HAL_CACHELINE_ALIGNED FIRMWARE_REQ_PARAM;
+
+/**
+ * file read request param
+ */
+#define FILE_READ_REQ_NAME_MAX_LEN  32
+typedef struct _FILE_READ_REQ_PARAM
+{
+    /* request param*/
+    char name[FILE_READ_REQ_NAME_MAX_LEN]; /* name buffer */
+    rt_uint8_t  *buf;           /* buffer address, load file data to a buffer*/
+    rt_uint32_t offset;         /* file offset */
+    rt_uint32_t reqlen;         /* need len */
+
+    /* return param*/
+    rt_uint32_t totalsize;      /* file total size */
+    rt_uint32_t rdlen;          /* read len */
+
+} HAL_CACHELINE_ALIGNED FILE_READ_REQ_PARAM;
 
 
 /**

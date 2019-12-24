@@ -83,11 +83,24 @@ static rt_err_t olpc_firmware_cache_invalidate(void *p)
 }
 #endif
 
+static rt_err_t olpc_file_cache_invalidate(void *p)
+{
+    FILE_READ_REQ_PARAM *param = (FILE_READ_REQ_PARAM *)p;
+
+    // invalidate cache
+    if ((SRAM_IADDR_START <= (rt_uint32_t)param->buf) && ((rt_uint32_t)param->buf < SRAM_IADDR_START + SRAM_SIZE))
+        rt_hw_cpu_icache_ops(RT_HW_CACHE_INVALIDATE, param->buf, (rt_uint32_t)param->rdlen);
+    else
+        rt_hw_cpu_dcache_ops(RT_HW_CACHE_INVALIDATE, param->buf, (rt_uint32_t)param->rdlen);
+
+    return RT_EOK;
+}
+
 static rt_err_t olpc_send_ap_command(rt_uint32_t cmd, void *param, rt_uint32_t paramlen)
 {
     struct MBOX_CMD_DAT cmdData;
     struct MBOX_REG *pReg;
-    uint32_t intc1, timeout, status = FIRMWARE_DOWNLOAD_OK;
+    uint32_t intc1, timeout, status = AP_STATUS_OK;
 
     RT_ASSERT(param);
 
@@ -113,7 +126,7 @@ static rt_err_t olpc_send_ap_command(rt_uint32_t cmd, void *param, rt_uint32_t p
         rt_thread_delay(1);
 
         HAL_MBOX_RecvMsg(pReg, 0);
-        if (pReg->A2B[0].CMD == FIRMWARE_DOWNLOAD_ACK)
+        if (pReg->A2B[0].CMD == AP_COMMAND_ACK)
         {
             status = pReg->A2B[0].DATA;
             break;
@@ -131,7 +144,7 @@ static rt_err_t olpc_send_ap_command(rt_uint32_t cmd, void *param, rt_uint32_t p
         return RT_ETIMEOUT;
     }
 
-    if (status != FIRMWARE_DOWNLOAD_OK)
+    if (status != AP_STATUS_OK)
     {
         return RT_ERROR;
     }
@@ -160,6 +173,21 @@ rt_err_t olpc_ap_command(rt_uint32_t cmd, void *param, rt_uint32_t paramlen)
         }
         break;
 #endif
+    case FILE_INFO_REQ:
+        ret = olpc_send_ap_command(FILE_INFO_REQ, param, paramlen);
+        if (ret == RT_EOK)
+        {
+            FILE_READ_REQ_PARAM *p = (FILE_READ_REQ_PARAM *)param;
+            rt_kprintf("FILE_INFO_REQ: %s size = 0x%08x, %d\n", p->name, p->totalsize, p->totalsize);
+        }
+        break;
+    case FIILE_READ_REQ:
+        ret = olpc_send_ap_command(FIILE_READ_REQ, param, paramlen);
+        if (ret == RT_EOK)
+        {
+            olpc_file_cache_invalidate(param);
+        }
+        break;
     default:
         rt_kprintf("olpc_ap_command: Undefined command!!!\n");
         break;

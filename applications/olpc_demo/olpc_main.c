@@ -17,6 +17,10 @@
 #include "olpc_touch.h"
 #endif
 
+#if defined(RT_USING_MODULE)
+#include "dlmodule.h"
+#endif
+
 /**
  * color palette for 1bpp
  */
@@ -55,7 +59,7 @@ rt_event_t olpc_main_event;
  */
 
 /**
- * Get firmware segment data by id.
+ * Get firmware from AP.
  */
 static rt_err_t olpc_firmware_request(rt_uint32_t id)
 {
@@ -67,6 +71,55 @@ static rt_err_t olpc_firmware_request(rt_uint32_t id)
     pParam->id   = id;
     pParam->type = SEGMENT_ALL;
     olpc_ap_command(FIRMWARE_DOWNLOAD_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
+#endif
+    return RT_EOK;
+}
+
+#if defined(RT_USING_CUSTOM_DLMODULE)
+/**
+ * Get dlmodule from AP.
+ */
+static rt_uint8_t *olpc_dlmodule_request(const char *name)
+{
+    rt_err_t ret;
+    FILE_READ_REQ_PARAM Param;
+    FILE_READ_REQ_PARAM *pParam = &Param;
+
+    RT_ASSERT(rt_strlen(name) < FILE_READ_REQ_NAME_MAX_LEN);
+
+    rt_memset(pParam, 0, sizeof(FILE_READ_REQ_PARAM));
+
+    /* Get dlmodule file size info */
+    rt_strncpy(pParam->name, name, rt_strlen(name));
+    ret = olpc_ap_command(FILE_INFO_REQ, pParam, sizeof(FILE_READ_REQ_PARAM));
+    RT_ASSERT(ret == RT_EOK);
+
+    /* Malloc buffer for dlmodule file */
+    pParam->buf = (rt_uint8_t *)rt_dma_malloc_large(pParam->totalsize);
+    RT_ASSERT(pParam->buf != RT_NULL);
+
+    /* Read dlmodule file data */
+    ret = olpc_ap_command(FIILE_READ_REQ, pParam, sizeof(FILE_READ_REQ_PARAM));
+    RT_ASSERT(ret == RT_EOK);
+
+    return pParam->buf;
+}
+
+static rt_err_t olpc_dlmodule_release(rt_uint8_t *param)
+{
+    rt_dma_free_large(param);
+
+    return RT_EOK;
+}
+#endif
+
+static int olpc_dlmodule_exec(const char *pgname)
+{
+#if defined(RT_USING_CUSTOM_DLMODULE)
+    struct rt_dlmodule_ops ops;
+    ops.load = olpc_dlmodule_request;
+    ops.unload = olpc_dlmodule_release;
+    dlmodule_exec_custom(pgname, pgname, rt_strlen(pgname), &ops);
 #endif
     return RT_EOK;
 }
@@ -126,6 +179,8 @@ static void olpc_main_thread(void *p)
 #elif defined(OLPC_APP_XSCREEN_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
 #endif
+
+    olpc_dlmodule_exec("hello.mo");
 
     while (1)
     {
