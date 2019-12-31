@@ -49,6 +49,7 @@ static uint32_t bpp1_lut[2] =
  **************************************************************************************************
  */
 rt_event_t olpc_main_event;
+RTM_EXPORT(olpc_main_event);
 
 /*
  **************************************************************************************************
@@ -165,7 +166,7 @@ static void olpc_main_thread(void *p)
 
     olpc_main_event = rt_event_create("olpcmain_event", RT_IPC_FLAG_FIFO);
     RT_ASSERT(olpc_main_event != RT_NULL);
-
+#if 0
 #if defined(OLPC_APP_CLOCK_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_CLOCK);
 #elif defined(OLPC_APP_EBOOK_ENABLE)
@@ -179,8 +180,10 @@ static void olpc_main_thread(void *p)
 #elif defined(OLPC_APP_XSCREEN_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
 #endif
+#endif
 
     olpc_dlmodule_exec("hello.mo");
+    olpc_dlmodule_exec("ebook.mo");
 
     while (1)
     {

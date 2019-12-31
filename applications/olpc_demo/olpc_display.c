@@ -25,6 +25,7 @@
  * color palette for RGB332
  */
 uint32_t bpp_lut[256] = {0};
+RTM_EXPORT(bpp_lut);
 
 /**
  * color palette for RGB332 and BGR233,default format is RGB332.
@@ -430,6 +431,7 @@ void rt_display_rotate_24bit(float angle, int w, int h, unsigned char *src, unsi
         m++;
     }
 }
+RTM_EXPORT(rt_display_rotate_24bit);
 
 void rt_display_rotate_8bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
 {
@@ -502,6 +504,7 @@ void rt_display_rotate_8bit(float angle, int w, int h, unsigned char *src, unsig
         m++;
     }
 }
+RTM_EXPORT(rt_display_rotate_8bit);
 
 void rt_display_rotate_16bit(float angle, int w, int h, unsigned short *src, unsigned short *dst, int dst_str, int xcen, int ycen)
 {
@@ -574,6 +577,7 @@ void rt_display_rotate_16bit(float angle, int w, int h, unsigned short *src, uns
         m++;
     }
 }
+RTM_EXPORT(rt_display_rotate_16bit);
 
 void rt_display_rotate_4bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
 {
@@ -656,6 +660,7 @@ void rt_display_rotate_4bit(float angle, int w, int h, unsigned char *src, unsig
         m++;
     }
 }
+RTM_EXPORT(rt_display_rotate_4bit);
 
 /**
  * color palette for RGB332 and BGR233,default format is RGB332.
@@ -711,6 +716,7 @@ void rt_display_update_lut(int format)
         printf("0x%08x, ", bpp_lut[i]); */
     }
 }
+RTM_EXPORT(rt_display_update_lut);
 
 /**
  * Check is if two display region overlapped
@@ -726,6 +732,7 @@ rt_err_t olpc_display_overlay_check(rt_uint16_t y1, rt_uint16_t y2, rt_uint16_t 
     // overlay
     return RT_ERROR;
 }
+RTM_EXPORT(olpc_display_overlay_check);
 
 /**
  * fill image data to fb buffer
@@ -931,6 +938,7 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
         }
     }
 }
+RTM_EXPORT(rt_display_img_fill);
 
 /**
  * list win layers.
@@ -956,6 +964,7 @@ rt_err_t rt_display_win_layers_list(struct rt_display_config **head, struct rt_d
 
     return RT_EOK;
 }
+RTM_EXPORT(rt_display_win_layers_list);
 
 /**
  * Configuration win layers.
@@ -1081,6 +1090,7 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
 
     return ret;
 }
+RTM_EXPORT(rt_display_win_layers_set);
 
 /**
  * backlight set.
@@ -1103,6 +1113,7 @@ rt_err_t rt_display_win_backlight_set(rt_uint16_t val)
 
     return ret;
 }
+RTM_EXPORT(rt_display_win_backlight_set);
 
 /**
  * Clear screen for display initial.
@@ -1135,6 +1146,7 @@ int rt_display_screen_clear(rt_device_t device)
 
     return ret;
 }
+RTM_EXPORT(rt_display_screen_clear);
 
 /**
  * Display screen scroll API.
@@ -1188,6 +1200,7 @@ rt_err_t rt_display_screen_scroll(rt_device_t device, uint8_t winId, uint32_t mo
 
     return RT_EOK;
 }
+RTM_EXPORT(rt_display_screen_scroll);
 
 /**
  * Display driver sync hook, wait for drv_display finish.
@@ -1210,6 +1223,7 @@ rt_err_t rt_display_sync_hook(rt_device_t device)
 
     return RT_EOK;
 }
+RTM_EXPORT(rt_display_sync_hook);
 
 /**
  * Get MAX value of backlight.
@@ -1220,6 +1234,7 @@ rt_uint16_t rt_display_get_bl_max(rt_device_t device)
 
     return state->panel_state.max_brightness;
 }
+RTM_EXPORT(rt_display_get_bl_max);
 
 /**
  * Display lut set.
@@ -1251,6 +1266,7 @@ rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt,
 
     return RT_EOK;
 }
+RTM_EXPORT(rt_display_win_clear);
 
 /**
  * Display lut set.
@@ -1357,6 +1373,7 @@ rt_err_t rt_display_lutset(struct rt_display_lut *lutA,
 
     return RT_EOK;
 }
+RTM_EXPORT(rt_display_lutset);
 
 /**
  * Display application initial, initial screen and win layers.
@@ -1459,6 +1476,7 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
 
     return disp_data;
 }
+RTM_EXPORT(rt_display_init);
 
 /**
  * Get global display data struct.
@@ -1467,6 +1485,7 @@ rt_display_data_t rt_display_get_disp(void)
 {
     return g_disp_data;
 }
+RTM_EXPORT(rt_display_get_disp);
 
 /**
  * Display application deinitial, free resources.
@@ -1485,5 +1504,6 @@ void rt_display_deinit(rt_display_data_t disp_data)
     rt_free(g_disp_data);
     g_disp_data = RT_NULL;
 }
+RTM_EXPORT(rt_display_deinit);
 
 #endif

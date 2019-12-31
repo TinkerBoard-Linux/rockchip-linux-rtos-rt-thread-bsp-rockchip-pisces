@@ -194,5 +194,6 @@ rt_err_t olpc_ap_command(rt_uint32_t cmd, void *param, rt_uint32_t paramlen)
     }
     return ret;
 }
+RTM_EXPORT(olpc_ap_command);
 
 #endif

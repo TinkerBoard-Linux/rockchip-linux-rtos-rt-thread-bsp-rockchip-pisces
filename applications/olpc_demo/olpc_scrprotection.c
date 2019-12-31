@@ -440,5 +440,6 @@ void olpc_srcprotect_app_init(rt_err_t (*hook)(void *parameter), void *parameter
     g_srcprotect_data->exithook      = hook;
     g_srcprotect_data->exithookparam = parameter;
 }
+RTM_EXPORT(olpc_srcprotect_app_init);
 
 #endif

@@ -70,6 +70,7 @@ rt_err_t register_touch_item(struct olpc_touch_item *item,
 
     return RT_EOK;
 }
+RTM_EXPORT(register_touch_item);
 
 rt_err_t unregister_touch_item(struct olpc_touch_item *item)
 {
@@ -92,6 +93,7 @@ rt_err_t unregister_touch_item(struct olpc_touch_item *item)
 
     return RT_ERROR;
 }
+RTM_EXPORT(unregister_touch_item);
 
 void update_item_coord(struct olpc_touch_item *item, rt_uint32_t fb_x, rt_uint32_t fb_y, rt_uint32_t x_offset, rt_uint32_t y_offset)
 {
@@ -104,6 +106,7 @@ void update_item_coord(struct olpc_touch_item *item, rt_uint32_t fb_x, rt_uint32
 
     //rt_kprintf("%s, x = %d, y = %d.\n", __func__, image->x_scr, image->y_scr);
 }
+RTM_EXPORT(update_item_coord);
 
 rt_uint8_t is_tp_in_item(struct point_info *point, image_info_t *item)
 {
@@ -118,11 +121,13 @@ rt_uint8_t is_tp_in_item(struct point_info *point, image_info_t *item)
 
     return 0;
 }
+RTM_EXPORT(is_tp_in_item);
 
 void olpc_touch_reset(void)
 {
     g_olpc_touch.state = TOUCH_EVENT_NULL;
 }
+RTM_EXPORT(olpc_touch_reset);
 
 rt_err_t iterate_touch_item_list(struct olpc_touch_item *header, struct point_info *point)
 {
@@ -262,6 +267,7 @@ rt_err_t iterate_touch_item_list(struct olpc_touch_item *header, struct point_in
 
     return RT_EOK;
 }
+RTM_EXPORT(iterate_touch_item_list);
 
 static void touch_mgr_thread_entry(void *parameter)
 {
@@ -300,6 +306,7 @@ void olpc_touch_list_clear(void)
     g_olpc_touch.touch_list = head;
     g_olpc_touch.state = TOUCH_EVENT_UP;//TOUCH_EVENT_NULL;
 }
+RTM_EXPORT(olpc_touch_list_clear);
 
 int olpc_touch_init(void)
 {
