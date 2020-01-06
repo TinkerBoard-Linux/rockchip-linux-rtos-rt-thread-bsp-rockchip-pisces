@@ -7,7 +7,7 @@
 #include <rtthread.h>
 #include "image_info.h"
 
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332)
+#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 // RGB332
 static const unsigned char clock_hour_129_14[1806UL] =
 {
@@ -71,7 +71,7 @@ image_info_t clock_hour_info =
     .data =  clock_hour_129_14,
 };
 
-#elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+#elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 // RGB565
 
 static const unsigned char clock_hour_129_14[3612UL] =

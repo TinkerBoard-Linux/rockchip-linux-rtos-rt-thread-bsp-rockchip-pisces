@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(OLPC_APP_CLOCK_ENABLE)
+#if defined(OLPC_APP_CLOCK_ENABLE) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 #include "image_info.h"
 
 static const unsigned char lock_block_120_144[2160UL] =

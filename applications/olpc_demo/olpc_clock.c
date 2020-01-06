@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(RT_USING_OLPC_DEMO) && defined(OLPC_APP_CLOCK_ENABLE)
+#if defined(OLPC_APP_CLOCK_ENABLE) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 
 #include "drv_heap.h"
 #include "image_info.h"

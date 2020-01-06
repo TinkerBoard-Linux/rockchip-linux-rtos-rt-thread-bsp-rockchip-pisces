@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC)
+#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 #include "image_info.h"
 
 static const unsigned char clock_min_135_4[540UL] =

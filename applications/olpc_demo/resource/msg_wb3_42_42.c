@@ -7,7 +7,7 @@
 #include <rtthread.h>
 #include "image_info.h"
 
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC)
+#if (defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC)) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 // RGB332
 static const unsigned char msg_wb3_42_42[1764UL] =
 {
@@ -70,7 +70,7 @@ image_info_t msg_wb3_info =
     .data = msg_wb3_42_42,
 };
 
-#elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+#elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 // RGB565
 static const unsigned char msg_wb3_42_42[3528UL] =
 {

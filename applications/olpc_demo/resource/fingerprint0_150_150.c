@@ -7,7 +7,7 @@
 #include <rtthread.h>
 #include "image_info.h"
 
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC)
+#if (defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ARABIC)) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 // RGB332
 static const unsigned char fingerprint0_150_150[456UL] =
 {
@@ -37,7 +37,7 @@ image_info_t fingerprint0_info =
     .data = fingerprint0_150_150,
 };
 
-#elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+#elif defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 // RGB565
 static const unsigned char fingerprint0_150_150[774UL] =
 {

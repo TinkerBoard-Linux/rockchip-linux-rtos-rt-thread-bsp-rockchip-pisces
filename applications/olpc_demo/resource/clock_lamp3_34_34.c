@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
+#if defined(OLPC_APP_CLOCK_LOOP_LAMP) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 #include "image_info.h"
 
 static const unsigned char clock_lamp3_34_34[1156UL] =
