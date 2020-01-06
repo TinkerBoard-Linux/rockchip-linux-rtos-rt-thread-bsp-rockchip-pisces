@@ -5,9 +5,17 @@ menuconfig RT_USING_OLPC_DEMO
     default n
 
 if RT_USING_OLPC_DEMO
-    config OLPC_OVERLAY_ENABLE
-        bool "olpc overlay enable"
-        default n
+    choice
+        prompt "olpc app load mode"
+        default OLPC_STATICLD_ENABLE
+        config OLPC_STATICLD_ENABLE
+            bool "static load mode"
+        config OLPC_DLMODULE_ENABLE
+            bool "dynamic load mode"
+            depends on RT_USING_CUSTOM_DLMODULE
+        config OLPC_OVERLAY_ENABLE
+            bool "overlay load mode"
+    endchoice
 
     config OLPC_APP_SRCSAVER_ENABLE
         bool "olpc screen saver enable"
@@ -57,7 +65,7 @@ if RT_USING_OLPC_DEMO
 
     config OLPC_APP_XSCREEN_ENABLE
         bool "olpc x-screen demo select"
-        depends on RT_USING_DTCM_HEAP && OLPC_OVERLAY_ENABLE
+        depends on RT_USING_DTCM_HEAP && (OLPC_OVERLAY_ENABLE || OLPC_DLMODULE_ENABLE)
         default n
 endif
 
