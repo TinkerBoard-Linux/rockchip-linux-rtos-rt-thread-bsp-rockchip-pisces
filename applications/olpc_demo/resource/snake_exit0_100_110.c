@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(OLPC_APP_SNAKE_ENABLE)
+#if defined(OLPC_APP_SNAKE_ENABLE) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 #include "image_info.h"
 
 static const unsigned char snake_exit0_100_110[1430UL] =

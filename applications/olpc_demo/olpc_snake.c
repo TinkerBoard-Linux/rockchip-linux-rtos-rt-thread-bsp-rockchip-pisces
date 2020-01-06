@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(OLPC_APP_SNAKE_ENABLE)
+#if defined(OLPC_APP_SNAKE_ENABLE) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 
 #include "drv_heap.h"
 #include "image_info.h"
