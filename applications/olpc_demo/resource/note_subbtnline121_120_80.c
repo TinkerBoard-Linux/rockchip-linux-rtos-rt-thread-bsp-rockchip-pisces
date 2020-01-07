@@ -5,7 +5,7 @@
   */
 
 #include <rtthread.h>
-#if defined(OLPC_APP_NOTE_ENABLE)
+#if defined(OLPC_APP_NOTE_ENABLE) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 #include "image_info.h"
 
 static const unsigned char note_subbtnline121_120_80[200UL] =
