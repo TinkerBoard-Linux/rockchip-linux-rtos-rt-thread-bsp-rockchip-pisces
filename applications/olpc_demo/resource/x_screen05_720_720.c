@@ -7,7 +7,7 @@
 #include <rtthread.h>
 #include "image_info.h"
 
-#if defined(OLPC_APP_XSCREEN_ENABLE)
+#if defined(OLPC_APP_XSCREEN_ENABLE) && (defined(OLPC_STATICLD_ENABLE) || defined(OLPC_OVERLAY_ENABLE))
 
 static const unsigned char x_screen05_720_720[22281UL] =
 {
