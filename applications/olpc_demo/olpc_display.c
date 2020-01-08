@@ -50,11 +50,14 @@ static int rt_decompress_read_buff(image_info_t *img_info)
 /**
  * decompress write buffer.
  */
-static void rt_decompress_write_buff(int value, rt_uint8_t *fb, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset, int width)
+static void rt_decompress_write_buff(int value, rt_uint8_t *fb, rt_int32_t fbsize, rt_int32_t xVir, rt_int32_t xoffset, rt_int32_t yoffset, int width)
 {
-    xoffset = xoffset + write_count % width;
-    yoffset = yoffset + write_count / width;
-    *((uint8_t *)((uint32_t)fb + (yoffset)* xVir + xoffset)) = value;
+    if (write_count < fbsize)
+    {
+        xoffset = xoffset + write_count % width;
+        yoffset = yoffset + write_count / width;
+        *((uint8_t *)((uint32_t)fb + (yoffset)* xVir + xoffset)) = value;
+    }
 
     if (value == EOF)
     {
@@ -165,7 +168,7 @@ static int rt_display_decompress(image_info_t *img_info, rt_uint8_t *fb, rt_int3
             next = FIRST_STRING;
         else if (prefix == CLEAR_CODE)      // this only happens at the first symbol which is always sent
         {
-            rt_decompress_write_buff(code, fb, xVir, xoffset, yoffset, img_info->w);                   // literally and becomes our initial prefix
+            rt_decompress_write_buff(code, fb, img_info->w * img_info->h, xVir, xoffset, yoffset, img_info->w);                   // literally and becomes our initial prefix
             next++;
         }
         // Otherwise we have a valid prefix so we step through the string from end to beginning storing the
@@ -183,11 +186,11 @@ static int rt_display_decompress(image_info_t *img_info, rt_uint8_t *fb, rt_int3
 
             c = *--rbp;     // the first byte in this string is the terminator for the last string, which is
             // the one that we'll create a new dictionary entry for this time
-            do rt_decompress_write_buff(*rbp, fb, xVir, xoffset, yoffset, img_info->w);                        // send string in corrected order (except for the terminator
-            while (rbp-- != reverse_buffer);        // which we don't know yet)
+            do rt_decompress_write_buff(*rbp, fb,  img_info->w * img_info->h, xVir, xoffset, yoffset, img_info->w);                        // send string in corrected order (except for the terminator
+            while (rbp-- != reverse_buffer);          // which we don't know yet)
 
             if (code == next - 1)
-                rt_decompress_write_buff(c, fb, xVir, xoffset, yoffset, img_info->w);
+                rt_decompress_write_buff(c, fb,  img_info->w * img_info->h, xVir, xoffset, yoffset, img_info->w);
 
             prefixes[next - 1 - 256] = prefix;     // now update the next dictionary entry with the new string
             terminators[next - 1 - 256] = c;       // (but we're always one behind, so it's not the string just sent)
