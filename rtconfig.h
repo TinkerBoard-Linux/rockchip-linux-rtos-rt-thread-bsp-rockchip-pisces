@@ -8,7 +8,8 @@
 #define PM_HAS_CUSTOM_CONFIG
 
 /* RT-Thread Kernel */
-
+#define RT_USING_CORE_RTTHREAD
+/* RT_USING_CORE_FREERTOS is not set */
 #define RT_NAME_MAX 8
 #define RT_ALIGN_SIZE 4
 /* RT_THREAD_PRIORITY_8 is not set */
