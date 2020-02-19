@@ -65,7 +65,12 @@ if RT_USING_OLPC_DEMO
 
     config OLPC_APP_XSCREEN_ENABLE
         bool "olpc x-screen demo select"
-        depends on RT_USING_DTCM_HEAP && (OLPC_OVERLAY_ENABLE || OLPC_DLMODULE_ENABLE)
+        depends on RT_USING_DTCM_HEAP && (OLPC_OVERLAY_ENABLE)
+        default n
+
+    config OLPC_APP_BLN_ENABLE
+        bool "olpc breathing light demo select"
+        depends on (!RT_USING_DTCM_HEAP) && (RT_USING_DSPFW_BUILTIN) && (!OLPC_DLMODULE_ENABLE)
         default n
 endif
 

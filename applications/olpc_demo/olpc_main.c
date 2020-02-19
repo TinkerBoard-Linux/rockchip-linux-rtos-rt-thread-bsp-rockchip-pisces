@@ -159,6 +159,8 @@ static void olpc_apps_init(void)
     rt_event_send(olpc_main_event, EVENT_APP_NOTE);
 #elif defined(OLPC_APP_XSCREEN_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
+#elif defined(OLPC_APP_BLN_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_BLN);
 #endif
 }
 
@@ -212,7 +214,8 @@ static void olpc_main_thread(void *p)
     while (1)
     {
         ret = rt_event_recv(olpc_main_event,
-                            EVENT_APP_CLOCK | EVENT_APP_EBOOK | EVENT_APP_BLOCK | EVENT_APP_SNAKE | EVENT_APP_NOTE | EVENT_APP_XSCREEN,
+                            EVENT_APP_CLOCK | EVENT_APP_EBOOK | EVENT_APP_BLOCK | EVENT_APP_SNAKE |
+                            EVENT_APP_NOTE  | EVENT_APP_XSCREEN | EVENT_APP_BLN,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         RT_ASSERT(ret == RT_EOK);
@@ -331,6 +334,30 @@ static void olpc_main_thread(void *p)
             if (ret)
             {
                 rt_kprintf("olpc_start_app_note error!!!\n");
+                olpc_apps_init();
+            }
+#else
+            olpc_apps_init();
+#endif
+        }
+        else if (event & EVENT_APP_BLN)
+        {
+#if defined(OLPC_APP_BLN_ENABLE)
+            ret = RT_ERROR;
+#if defined (OLPC_DLMODULE_ENABLE)
+            ret = olpc_dlmodule_exec("bln.mo");
+#elif defined (OLPC_OVERLAY_ENABLE)
+            ret = olpc_firmware_request(SEGMENT_ID_OLPC_BLN);
+            if (ret == RT_EOK)
+            {
+                ret = olpc_bln_app_init();
+            }
+#elif defined (OLPC_STATICLD_ENABLE)
+            ret = olpc_bln_app_init();
+#endif
+            if (ret)
+            {
+                rt_kprintf("olpc_start_app_bln error!!!\n");
                 olpc_apps_init();
             }
 #else

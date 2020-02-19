@@ -319,6 +319,56 @@ static unsigned char rt_display_SegGradSelect_16bit(int x, int y, int w, int h, 
     return alpha;
 }
 
+static unsigned char rt_display_SegGradSelect_32bit(int x, int y, int w, int h, int x_res, int y_res, unsigned int *data, unsigned int *src)
+{
+    unsigned char alpha = 0xff;
+    int pos = 0;
+    if (x == -1 && y == -1)
+    {
+        alpha = (x_res * y_res) >> 8;
+        pos = (y + 1) * w + (x + 1);
+    }
+    else if (x == w && y == -1)
+    {
+        alpha = ((255 - x_res) * y_res) >> 8;
+        pos = (y + 1) * w + (x - 1);
+    }
+    else if (x == -1 && y == h)
+    {
+        alpha = ((x_res) * (255 - y_res)) >> 8;
+        pos = (y - 1) * w + (x + 1);
+    }
+    else if (x == w && y == h)
+    {
+        alpha = ((255 - x_res) * (255 - y_res)) >> 8;
+        *data = src[(y - 1) * w + (x - 1)];
+    }
+    else if (x == -1 && y > -1 && y < h)
+    {
+        alpha = x_res;
+        pos = y * w + (x + 1);
+    }
+    else if (y == -1 && x > -1 && x < w)
+    {
+        alpha = y_res;
+        pos = (y + 1) * w + x;
+    }
+    else if (x == w && y > -1 && y < h)
+    {
+        alpha = 255 - x_res;
+        pos = y * w + x - 1;
+    }
+    else if (y == h && x > -1 && x < w)
+    {
+        alpha = 255 - y_res;
+        pos = (y - 1) * w + x;
+    }
+
+    *data = src[pos];
+
+    return alpha;
+}
+
 static unsigned char rt_display_SegGradSelect_4bit(int x, int y, int w, int h, int x_res, int y_res, unsigned char *data, unsigned char *src)
 {
     unsigned char alpha = 0xff;
@@ -370,10 +420,88 @@ static unsigned char rt_display_SegGradSelect_4bit(int x, int y, int w, int h, i
     return alpha;
 }
 
-
 /**
  * display rotate.
  */
+void rt_display_rotate_32bit(float angle, int w, int h, unsigned int *src, unsigned int *dst, int dst_str, int xcen, int ycen)
+{
+    int x, y;
+
+    int xlt, xrt, xld, xrd;
+    int ylt, yrt, yld, yrd;
+    int xmin, xmax, ymin, ymax;
+
+    //rt_kprintf("angle = %d, w = %d, h = %d, src = 0x%08x, dst = 0x%08x, dst_str = %d, xcen = %d, ycen = %d\n",
+    //            (int)angle, w, h, src, dst, dst_str, xcen, ycen);
+
+    float cosa = cos((angle * PI) / 180);
+    float sina = sin((angle * PI) / 180);
+
+    xlt = cosa * (-xcen) + -sina * (-ycen);
+    ylt = sina * (-xcen) +  cosa * (-ycen);
+    xrt = cosa * (w - xcen) + -sina * (-ycen);
+    yrt = sina * (w - xcen) +  cosa * (-ycen);
+    xld = cosa * (-xcen) + -sina * (h - ycen);
+    yld = sina * (-xcen) +  cosa * (h - ycen);
+    xrd = cosa * (w - xcen) + -sina * (h - ycen);
+    yrd = sina * (w - xcen) +  cosa * (h - ycen);
+
+    xmin = MIN(xrd, MIN(xld, MIN(xlt, xrt))) - 1;
+    xmax = MAX(xrd, MAX(xld, MAX(xlt, xrt))) + 1;
+    ymin = MIN(yrd, MIN(yld, MIN(ylt, yrt))) - 1;
+    ymax = MAX(yrd, MAX(yld, MAX(ylt, yrt))) + 1;
+
+    float x_pos, y_pos;
+    unsigned char alpha;
+
+    int m = ymin;
+    for (int j = ymin; j < ymax; j++)
+    {
+        int n = xmin;
+        for (int i = xmin; i < xmax; i++)
+        {
+            x_pos = (cosa * i + sina * j) + xcen;
+            y_pos = (-sina * i + cosa * j) + ycen;
+            x = floor(x_pos);
+            y = floor(y_pos);
+
+            if ((x_pos >= 0) && (x_pos < w) && (y_pos >= 0) && (y_pos < h))
+            {
+                dst[m * dst_str + n] = src[y * w + x];
+            }
+            else if ((x >= -1) && (y >= -1) && (x <= w) && (y <= h))
+            {
+                int x_res = (x_pos - x) * (1 << 8);
+                int y_res = (y_pos - y) * (1 << 8);
+                unsigned int data;
+
+                alpha = rt_display_SegGradSelect_32bit(x, y, w, h, x_res, y_res, &data, src);
+
+                unsigned char /*sa,*/ sr, sg, sb, da, dr, dg, db;
+
+                sr = (dst[m * dst_str + n]) & 0xff;
+                sg = (dst[m * dst_str + n] >> 8) & 0xff;
+                sb = (dst[m * dst_str + n] >> 16) & 0xff;
+                //sa = (dst[m*dst_str + n] >> 24) & 0xff;
+
+                dr = (data) & 0xff;
+                dg = (data >> 8) & 0xff;
+                db = (data >> 16) & 0xff;
+                da = (data >> 24) & 0xff;
+                alpha = (alpha * da) >> 8;
+
+                dr = (sr * (255 - alpha) + dr * alpha) >> 8;
+                dg = (sg * (255 - alpha) + dg * alpha) >> 8;
+                db = (sb * (255 - alpha) + db * alpha) >> 8;
+
+                dst[m * dst_str + n] = dr | (dg << 8) | (db << 16) | (da << 24);
+            }
+            n++;
+        }
+        m++;
+    }
+}
+
 void rt_display_rotate_24bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen)
 {
     int x, y;
@@ -764,6 +892,17 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
             ret = rt_display_decompress(&info, fb, xVir, xoffset, yoffset);
             RT_ASSERT(ret == RT_EOK);
         }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_ARGB888)
+        {
+            image_info_t info;
+            rt_memcpy(&info, img_info, sizeof(image_info_t));
+            info.x  *= 4;
+            info.w  *= 4;
+            xVir    *= 4;
+            xoffset *= 4;
+            ret = rt_display_decompress(&info, fb, xVir, xoffset, yoffset);
+            RT_ASSERT(ret == RT_EOK);
+        }
         else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_GRAY16)
         {
             image_info_t info;
@@ -811,6 +950,16 @@ void rt_display_img_fill(image_info_t *img_info, rt_uint8_t *fb, rt_int32_t xVir
                 for (x = xoffset * 2; x < xoffset * 2 + img_info->w * 2; x++)
                 {
                     fb[(y * xVir * 2) + x] = img_info->data[i++];
+                }
+            }
+        }
+        else if (img_info->pixel == RTGRAPHIC_PIXEL_FORMAT_ARGB888)
+        {
+            for (i = 0, y = yoffset; y < yoffset + img_info->h; y++)
+            {
+                for (x = xoffset * 4; x < xoffset * 4 + img_info->w * 4; x++)
+                {
+                    fb[(y * xVir * 4) + x] = img_info->data[i++];
                 }
             }
         }
@@ -1051,17 +1200,20 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
         win_config.xLoopOffset = 0;
         win_config.yLoopOffset = 0;
 
-        win_config.alphaEn = 0;
-        win_config.alphaMode = VOP_ALPHA_MODE_PER_PIXEL;
-        win_config.alphaPreMul = VOP_NON_PREMULT_ALPHA;
+        win_config.alphaEn = cfg->alphaEn;
+        win_config.alphaMode = cfg->alphaMode;
+        win_config.alphaPreMul = cfg->alphaPreMul;
+        win_config.globalAlphaValue = cfg->globalAlphaValue;
 
         win_config.lut    = disp_data->lut[cfg->winId].lut;
         win_config.format = disp_data->lut[cfg->winId].format;
-
-        //rt_kprintf("winId = %d, srcX = %d, srcY = %d, srcW = %d, srcH =%d, lut = %d, format =%d\n",
-        //            win_config.winId, win_config.srcX, win_config.srcY, win_config.srcW, win_config.srcH,
-        //            win_config.lut,  win_config.format);
-
+#if 0
+        rt_kprintf("winId = %d, srcX = %d, srcY = %d, srcW = %d, srcH =%d, lut = %d, format =%d\n",
+                   win_config.winId, win_config.srcX, win_config.srcY, win_config.srcW, win_config.srcH,
+                   win_config.lut,  win_config.format);
+        rt_kprintf("alphaEn = %d, alphaMode = %d, alphaPreMul = %d, globalAlphaValue = %d\n",
+                   win_config.alphaEn, win_config.alphaMode, win_config.alphaPreMul, win_config.globalAlphaValue);
+#endif
         ret = rt_device_control(device, RK_DISPLAY_CTRL_SET_PLANE, &win_config);
         RT_ASSERT(ret == RT_EOK);
 
@@ -1242,12 +1394,39 @@ RTM_EXPORT(rt_display_get_bl_max);
 /**
  * Display lut set.
  */
+static rt_uint8_t fmt2bps[RTGRAPHIC_PIXEL_FORMAT_VYUY422_4 + 1] =
+{
+    1,  //RTGRAPHIC_PIXEL_FORMAT_MONO = 0,
+    1,  //RTGRAPHIC_PIXEL_FORMAT_GRAY1,
+    2,  //RTGRAPHIC_PIXEL_FORMAT_GRAY4,
+    4,  //RTGRAPHIC_PIXEL_FORMAT_GRAY16,
+    8,  //RTGRAPHIC_PIXEL_FORMAT_GRAY256,
+    8,  //RTGRAPHIC_PIXEL_FORMAT_RGB332,
+    16, //RTGRAPHIC_PIXEL_FORMAT_RGB444,
+    16, //RTGRAPHIC_PIXEL_FORMAT_RGB565,
+    16, //RTGRAPHIC_PIXEL_FORMAT_BGR565 = RTGRAPHIC_PIXEL_FORMAT_RGB565P,
+    24, //RTGRAPHIC_PIXEL_FORMAT_RGB666,
+    24, //RTGRAPHIC_PIXEL_FORMAT_RGB888,
+    32, //RTGRAPHIC_PIXEL_FORMAT_ARGB888,
+    32, //RTGRAPHIC_PIXEL_FORMAT_ABGR888,
+    24, //RTGRAPHIC_PIXEL_FORMAT_ARGB565,
+    32,  //RTGRAPHIC_PIXEL_FORMAT_ALPHA,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YUV420,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YUV422,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YUV444,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YVYU422,
+    32, //RTGRAPHIC_PIXEL_FORMAT_VYUY422,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YUV420_4,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YUV422_4,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YUV444_4,
+    32, //RTGRAPHIC_PIXEL_FORMAT_YVYU422_4,
+    32, //RTGRAPHIC_PIXEL_FORMAT_VYUY422_4,
+};
 rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt,
                               rt_uint16_t y, rt_uint16_t h, rt_uint8_t data)
 {
     rt_err_t ret;
     struct rt_display_config wincfg;
-    rt_uint8_t fmt2bps[8] = {0, 1, 2, 4, 8, 8, 16, 16};
 
     RT_ASSERT((y % 2) == 0);
     RT_ASSERT((h % 2) == 0);
@@ -1261,6 +1440,8 @@ rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt,
     wincfg.fblen = wincfg.w * wincfg.h * fmt2bps[fmt] / 8;
     wincfg.fb    = (rt_uint8_t *)rt_malloc_large(wincfg.fblen);
     rt_memset((void *)wincfg.fb, data, wincfg.fblen);
+
+    rt_kprintf("fmt = %d, len = %d, max = %d\n", fmt, fmt2bps[fmt], RTGRAPHIC_PIXEL_FORMAT_VYUY422_4);
 
     ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);

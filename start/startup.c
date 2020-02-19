@@ -117,6 +117,15 @@ extern rt_uint32_t __olpnote_data_len;
 extern rt_uint32_t __olpnote_bss_vma;
 extern rt_uint32_t __olpnote_bss_len;
 
+extern rt_uint32_t __olpbln_text_lma;
+extern rt_uint32_t __olpbln_text_vma;
+extern rt_uint32_t __olpbln_text_len;
+extern rt_uint32_t __olpbln_data_lma;
+extern rt_uint32_t __olpbln_data_vma;
+extern rt_uint32_t __olpbln_data_len;
+extern rt_uint32_t __olpbln_bss_vma;
+extern rt_uint32_t __olpbln_bss_len;
+
 extern rt_uint32_t __olpxscreen_text_lma;
 extern rt_uint32_t __olpxscreen_text_vma;
 extern rt_uint32_t __olpxscreen_text_len;
@@ -359,6 +368,22 @@ FIRMWARE_INFO_T const FirmwareInfo  =
                 &__olpnote_bss_len,
 
                 "OLPC_NOTE",        // string len must < 16
+            },
+
+            // .olpc_bln
+            {
+                &__olpbln_text_lma,
+                &__olpbln_text_vma,
+                &__olpbln_text_len,
+
+                &__olpbln_data_lma,
+                &__olpbln_data_vma,
+                &__olpbln_data_len,
+
+                &__olpbln_bss_vma,
+                &__olpbln_bss_len,
+
+                "OLPC_BLN",        // string len must < 16
             },
 
             // .olpc_xscreen

@@ -46,6 +46,7 @@
 #define EVENT_APP_SNAKE     (0x01UL << 3)
 #define EVENT_APP_NOTE      (0x01UL << 4)
 #define EVENT_APP_XSCREEN   (0x01UL << 5)
+#define EVENT_APP_BLN       (0x01UL << 6)
 
 /**
  * Global data struct for olpc display demo
@@ -72,6 +73,11 @@ struct rt_display_config
     rt_uint16_t ylast;
     rt_uint16_t w;
     rt_uint16_t h;
+
+    rt_uint8_t  alphaEn;
+    rt_uint8_t  alphaMode;
+    rt_uint8_t  alphaPreMul;
+    rt_uint8_t  globalAlphaValue;
 };
 
 struct rt_display_data
@@ -101,6 +107,7 @@ void rt_display_rotate_4bit(float angle, int w, int h, unsigned char *src, unsig
 void rt_display_rotate_8bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen);
 void rt_display_rotate_16bit(float angle, int w, int h, unsigned short *src, unsigned short *dst, int dst_str, int xcen, int ycen);
 void rt_display_rotate_24bit(float angle, int w, int h, unsigned char *src, unsigned char *dst, int dst_str, int xcen, int ycen);
+void rt_display_rotate_32bit(float angle, int w, int h, unsigned int *src, unsigned int *dst, int dst_str, int xcen, int ycen);
 
 /**
  * color palette for RGB332 and BGR233,default format is RGB332.
@@ -218,6 +225,10 @@ int olpc_snake_app_init(void);
  * olpc xscreen demo application init.
  */
 int olpc_xscreen_app_init(void);
+/**
+ * olpc bln demo application init.
+ */
+int olpc_bln_app_init(void);
 
 /**
  * screen protection API.
