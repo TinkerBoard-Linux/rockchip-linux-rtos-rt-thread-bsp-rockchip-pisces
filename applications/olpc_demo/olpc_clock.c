@@ -56,10 +56,17 @@ static uint32_t bpp1_lut[2] =
 #define LAMP_FB_W           (((LAMP_MAX_NUM * LAMP_HORIZONTAL_STEP - LAMP_HORIZONTAL_DIFF + 3) / 4) * 4)    // 484:  484
 #define LAMP_FB_H           (((LAMP_VERTICAL_SIZE + 3) / 4) * 4)                                            // 36:   36
 
+#define BLN_REGION_X        20
+#define BLN_REGION_Y        20
+#define BLN_REGION_W        120
+#define BLN_REGION_H        120
+#define BLN_FB_W            120
+#define BLN_FB_H            120
+
 #define CLOCK_REGION_X      (LAMP_REGION_X + ((LAMP_HORIZONTAL_SIZE + 3) / 4) * 4)                          // 47:   47   = 11 + 36
-#define CLOCK_REGION_Y      (LAMP_REGION_Y + ((LAMP_VERTICAL_SIZE   + 3) / 4) * 4)                          // 70:   70   = 34 + 36
+#define CLOCK_REGION_Y      (LAMP_REGION_Y + ((LAMP_VERTICAL_SIZE   + 3) / 4) * 4 + 80)  // 150             // 70:   70   = 34 + 36
 #define CLOCK_REGION_W      (WIN_LAYERS_W - CLOCK_REGION_X * 2)                                             // 986:  1080 = 11 + 36 + 986 + 36 + 11
-#define CLOCK_REGION_H      640
+#define CLOCK_REGION_H      (640 - 80)
 #define CLOCK_FB_W          440
 #define CLOCK_FB_H          440
 #define CLOCK_MOVE_XSTEP    200
@@ -107,10 +114,11 @@ static uint32_t bpp1_lut[2] =
 #define UPDATE_FINGERP      (0x01UL << 3)
 #define UPDATE_LOCK         (0x01UL << 4)
 #define UPDATE_LAMP         (0x01UL << 5)
+#define UPDATE_BLN          (0x01UL << 6)
 
-#define MOVE_CLOCK          (0x01UL << 6)
-#define MOVE_MSG            (0x01UL << 7)
-#define MOVE_LAMP           (0x01UL << 8)
+#define MOVE_CLOCK          (0x01UL << 7)
+#define MOVE_MSG            (0x01UL << 8)
+#define MOVE_LAMP           (0x01UL << 9)
 
 /* Screen state define */
 #define SCREEN_OFF          0
@@ -134,6 +142,11 @@ static uint32_t bpp1_lut[2] =
 #define SCREEN_HOLD_TIME    (RT_TICK_PER_SECOND * 5)
 #define FP_LOOP_TIME        (RT_TICK_PER_SECOND / 10)
 #define LAMP_LOOP_TIME      (RT_TICK_PER_SECOND / 5)
+
+#define BLN_ROTATE_TICKS        ((RT_TICK_PER_SECOND / 1000) * 33)
+#define OLPC_ROTATE_PARAM_STEP  1
+#define BLN_ROTATE_TIME         900
+#define BLN_BREADTH_TIME        3000
 
 /*
  **************************************************************************************************
@@ -188,17 +201,6 @@ extern image_info_t fingerprint1_info;
 extern image_info_t fingerprint2_info;
 extern image_info_t fingerprint3_info;
 
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-extern image_info_t clock_lamp0_info;
-extern image_info_t clock_lamp1_info;
-extern image_info_t clock_lamp2_info;
-extern image_info_t clock_lamp3_info;
-extern image_info_t clock_lamp4_info;
-extern image_info_t clock_lamp5_info;
-extern image_info_t clock_lamp6_info;
-extern image_info_t clock_lamp7_info;
-#endif
-
 #if defined(RT_USING_TOUCH)
 static rt_err_t olpc_clock_screen_touch_register(void *parameter);
 static rt_err_t olpc_clock_screen_touch_unregister(void *parameter);
@@ -212,7 +214,20 @@ static image_info_t screen_item;
 #endif
 
 #if defined(OLPC_APP_CLOCK_LOOP_LAMP)
+extern image_info_t clock_lamp0_info;
+extern image_info_t clock_lamp1_info;
+extern image_info_t clock_lamp2_info;
+extern image_info_t clock_lamp3_info;
+extern image_info_t clock_lamp4_info;
+extern image_info_t clock_lamp5_info;
+extern image_info_t clock_lamp6_info;
+extern image_info_t clock_lamp7_info;
+
 static rt_err_t olpc_lamp_init(void *parameter);
+#endif
+
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+static void olpc_bln_timeout(void *parameter);
 #endif
 
 /*
@@ -229,14 +244,22 @@ struct olpc_clock_data
     rt_uint8_t *fb;
     rt_uint32_t fblen;
 
-    rt_uint8_t *lampfb;
-    rt_uint32_t lampfblen;
-    rt_int16_t  lamp_ylast;
-
     rt_timer_t  clock_timer;
     rt_timer_t  src_timer;
     rt_timer_t  fp_timer;
+
+#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
+    rt_uint8_t *lampfb;
+    rt_uint32_t lampfblen;
+    rt_int16_t  lamp_ylast;
     rt_timer_t  lamp_timer;
+#endif
+
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+    rt_timer_t  bln_timer;
+    rt_uint16_t rotatenum;
+    rt_uint16_t rotatemax;
+#endif
 
     rt_event_t  disp_event;
     rt_uint32_t cmd;
@@ -636,7 +659,7 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 
 #if defined(OLPC_APP_CLOCK_LOOP_LAMP)
     olpc_lamp_init(olpc_data);
-    // create lamp touch timer
+    // create lamp timer
     olpc_data->lamp_timer = rt_timer_create("lamptimer",
                                             olpc_lamp_timeout,
                                             (void *)olpc_data,
@@ -645,6 +668,18 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
     RT_ASSERT(olpc_data->lamp_timer != RT_NULL);
     rt_timer_start(olpc_data->lamp_timer);
 #endif
+
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+    // create breathlight timer
+    olpc_data->bln_timer = rt_timer_create("blntimer",
+                                           olpc_bln_timeout,
+                                           (void *)olpc_data,
+                                           BLN_ROTATE_TICKS,
+                                           RT_TIMER_FLAG_ONE_SHOT);
+    RT_ASSERT(olpc_data->bln_timer != RT_NULL);
+    rt_timer_start(olpc_data->bln_timer);
+#endif
+
     // create clock timer
     olpc_data->clock_timer = rt_timer_create("clocktimer",
                              olpc_clock_timeout,
@@ -663,6 +698,13 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
 static void olpc_clock_deinit(struct olpc_clock_data *olpc_data)
 {
     rt_err_t ret;
+
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+    rt_timer_stop(olpc_data->bln_timer);
+    ret = rt_timer_delete(olpc_data->bln_timer);
+    RT_ASSERT(ret == RT_EOK);
+    olpc_data->bln_timer = RT_NULL;
+#endif
 
 #if defined(OLPC_APP_CLOCK_LOOP_LAMP)
     rt_timer_stop(olpc_data->lamp_timer);
@@ -1371,14 +1413,174 @@ static rt_err_t olpc_clock_lamp_refresh(struct olpc_clock_data *olpc_data,
 
     return RT_EOK;
 }
+#endif
+
+
 /*
  **************************************************************************************************
  *
- * endof lamp functions
+ * breathlight functions
  *
  **************************************************************************************************
  */
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+
+extern image_info_t clock_bln03_info;
+extern image_info_t clock_bln05_info;
+extern image_info_t clock_bln07_info;
+extern image_info_t clock_bln09_info;
+extern image_info_t clock_bln11_info;
+extern image_info_t clock_bln13_info;
+extern image_info_t clock_bln15_info;
+extern image_info_t clock_bln17_info;
+extern image_info_t clock_bln19_info;
+extern image_info_t clock_bln21_info;
+extern image_info_t clock_bln23_info;
+extern image_info_t clock_bln25_info;
+extern image_info_t clock_bln27_info;
+extern image_info_t clock_bln29_info;
+extern image_info_t clock_bln31_info;
+extern image_info_t clock_bln33_info;
+extern image_info_t clock_bln35_info;
+extern image_info_t clock_bln37_info;
+extern image_info_t clock_bln39_info;
+extern image_info_t clock_bln41_info;
+extern image_info_t clock_bln43_info;
+extern image_info_t clock_bln45_info;
+extern image_info_t clock_bln47_info;
+extern image_info_t clock_bln49_info;
+extern image_info_t clock_bln51_info;
+extern image_info_t clock_bln53_info;
+
+#define BLN_ITEM_MAX    26
+static const image_info_t *bln_item[BLN_ITEM_MAX] =
+{
+    &clock_bln03_info,
+    &clock_bln05_info,
+    &clock_bln07_info,
+    &clock_bln09_info,
+    &clock_bln11_info,
+    &clock_bln13_info,
+    &clock_bln15_info,
+    &clock_bln17_info,
+    &clock_bln19_info,
+    &clock_bln21_info,
+    &clock_bln23_info,
+    &clock_bln25_info,
+    &clock_bln27_info,
+    &clock_bln29_info,
+    &clock_bln31_info,
+    &clock_bln33_info,
+    &clock_bln35_info,
+    &clock_bln37_info,
+    &clock_bln39_info,
+    &clock_bln41_info,
+    &clock_bln43_info,
+    &clock_bln45_info,
+    &clock_bln47_info,
+    &clock_bln49_info,
+    &clock_bln51_info,
+    &clock_bln53_info,
+};
+
+/**
+ * breathlight refresh timer callback.
+ */
+static void olpc_bln_timeout(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+    rt_uint32_t ticks;
+
+    //if (olpc_data->rotatenum * BLN_ROTATE_TICKS < BLN_ROTATE_TIME)
+    if (olpc_data->rotatenum < BLN_ITEM_MAX)
+    {
+        olpc_data->cmd |= UPDATE_BLN;
+        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+
+        olpc_data->rotatenum += OLPC_ROTATE_PARAM_STEP;
+        if (olpc_data->rotatenum < BLN_ITEM_MAX)
+        {
+            ticks = BLN_ROTATE_TICKS;
+        }
+        else
+        {
+            olpc_data->rotatenum = 0;
+            ticks = BLN_BREADTH_TIME - BLN_ROTATE_TIME;
+        }
+    }
+    else
+    {
+        olpc_data->rotatenum = 0;
+        olpc_data->cmd |= UPDATE_BLN;
+        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        olpc_data->rotatenum += OLPC_ROTATE_PARAM_STEP;
+    }
+
+    rt_timer_control(olpc_data->bln_timer, RT_TIMER_CTRL_SET_TIME, &ticks);
+    rt_timer_start(olpc_data->bln_timer);
+}
+
+/**
+ * breathlight region refresh.
+ */
+static rt_err_t olpc_clock_bln_region_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
+{
+    rt_err_t ret;
+    rt_int16_t   xoffset, yoffset;
+    rt_device_t  device = olpc_data->disp->device;
+    image_info_t *img_info = NULL;
+    struct rt_device_graphic_info info;
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
+
+    wincfg->winId = CLOCK_RGB332_WIN;
+    wincfg->fb    = olpc_data->fb;
+    wincfg->w     = ((BLN_FB_W + 3) / 4) * 4;
+    wincfg->h     = BLN_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h;
+    wincfg->x     = BLN_REGION_X + (BLN_REGION_W - BLN_FB_W) / 2;
+    wincfg->y     = BLN_REGION_Y + (BLN_REGION_H - BLN_FB_H) / 2;
+    wincfg->y     = (wincfg->y / 2) * 2;
+    wincfg->ylast = wincfg->y;
+
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
+
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
+
+    xoffset = 0;
+    yoffset = 0;
+
+    //if (olpc_data->screen_sta == SCREEN_HOME)
+    {
+        // draw breathlight
+        if (olpc_data->rotatenum >= BLN_ITEM_MAX)
+        {
+            olpc_data->rotatenum--;
+        }
+        img_info = bln_item[olpc_data->rotatenum];
+        RT_ASSERT(img_info->w <= wincfg->w);
+        RT_ASSERT(img_info->h <= wincfg->h);
+
+        yoffset  += 0;
+        xoffset  += (BLN_FB_W - img_info->w) / 2;
+        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
+    }
+
+    return RT_EOK;
+}
 #endif
+
+/*
+ **************************************************************************************************
+ *
+ * clock home regions refresh
+ *
+ **************************************************************************************************
+ */
 
 /**
  * Clock region move.
@@ -1604,7 +1806,7 @@ static rt_err_t olpc_clock_msg_region_move(struct olpc_clock_data *olpc_data)
 }
 
 /**
- * Clock region refresh.
+ * msg region refresh.
  */
 static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
         struct rt_display_config *wincfg)
@@ -1822,7 +2024,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
 }
 
 /**
- * Clock region refresh.
+ * home region refresh.
  */
 static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data,
         struct rt_display_config *wincfg)
@@ -1886,7 +2088,7 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
 }
 
 /**
- * Clock region refresh.
+ * fingerprint region refresh.
  */
 static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *olpc_data,
         struct rt_display_config *wincfg)
@@ -1942,8 +2144,9 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     return RT_EOK;
 }
 
+
 /**
- * Clock region refresh.
+ * lock region refresh.
  */
 static rt_uint8_t unlock_flag = 0;
 static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data,
@@ -2037,12 +2240,8 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
 
     //rt_tick_t ticks = rt_tick_get();
 
-#if 0
-#define updatecmd (olpc_data->cmd)
-#else
     rt_uint32_t updatecmd = olpc_data->cmd;
     olpc_data->cmd = 0;
-#endif
     do
     {
         winhead = RT_NULL;
@@ -2211,6 +2410,15 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
                 }
 #endif
             }
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+            else if ((updatecmd & UPDATE_BLN) == UPDATE_BLN)
+            {
+                updatecmd &= ~UPDATE_BLN;
+
+                ret = olpc_clock_bln_region_refresh(olpc_data, &wincfg);
+                RT_ASSERT(ret == RT_EOK);
+            }
+#endif
         }
 
         //refresh screen
@@ -2229,17 +2437,8 @@ static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
             ret = rt_display_win_layers_set(winhead);
             RT_ASSERT(ret == RT_EOK);
         }
-#if 0
-        if (updatecmd != 0)
-        {
-            rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-        }
-    }
-    while (0);
-#else
     }
     while (updatecmd != 0);
-#endif
 
     //rt_kprintf("clock ticks = %d\n", rt_tick_get() - ticks);
 

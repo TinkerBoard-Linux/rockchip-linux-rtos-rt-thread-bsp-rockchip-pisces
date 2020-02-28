@@ -1441,8 +1441,6 @@ rt_err_t rt_display_win_clear(rt_uint8_t winid, rt_uint8_t fmt,
     wincfg.fb    = (rt_uint8_t *)rt_malloc_large(wincfg.fblen);
     rt_memset((void *)wincfg.fb, data, wincfg.fblen);
 
-    rt_kprintf("fmt = %d, len = %d, max = %d\n", fmt, fmt2bps[fmt], RTGRAPHIC_PIXEL_FORMAT_VYUY422_4);
-
     ret = rt_display_win_layers_set(&wincfg);
     RT_ASSERT(ret == RT_EOK);
 

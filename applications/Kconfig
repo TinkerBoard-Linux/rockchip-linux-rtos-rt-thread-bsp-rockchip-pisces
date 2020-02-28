@@ -26,6 +26,10 @@ if RT_USING_OLPC_DEMO
         default n
 
     if OLPC_APP_CLOCK_ENABLE
+        config OLPC_APP_CLOCK_BLN_ENABLE
+            bool "olpc clock breathlight enable"
+            default y
+
         choice
             prompt "olpc clock style select"
             default OLPC_APP_CLOCK_STYLE_ROUND_ARABIC
@@ -42,7 +46,7 @@ if RT_USING_OLPC_DEMO
 
         config OLPC_APP_CLOCK_LOOP_LAMP
             bool "olpc clock loop lamp enable"
-            depends on OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565
+            depends on (!OLPC_APP_CLOCK_BLN_ENABLE) && OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565
             default n
     endif
 
