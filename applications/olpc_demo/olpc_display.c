@@ -1183,7 +1183,7 @@ rt_err_t rt_display_win_layers_set(struct rt_display_config *wincfg)
         win_config.winEn = 1;
         win_config.winUpdate = 1;
 
-        win_config.zpos = 0;
+        win_config.zpos = cfg->zpos;
 
         win_config.yrgbAddr = (uint32_t)cfg->fb;
         win_config.cbcrAddr = (uint32_t)cfg->fb;
@@ -1581,13 +1581,15 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     disp_data = (struct rt_display_data *)rt_malloc(sizeof(struct rt_display_data));
     RT_ASSERT(disp_data != RT_NULL);
     rt_memset((void *)disp_data, 0, sizeof(struct rt_display_data));
-    g_disp_data = disp_data;
 
     device = rt_device_find("lcd");
     RT_ASSERT(device != RT_NULL);
 
     ret = rt_device_open(device, RT_DEVICE_OFLAG_RDWR);
     RT_ASSERT(ret == RT_EOK);
+
+    disp_data->disp_mq = rt_mq_create("disp_mq", sizeof(struct rt_display_mq_t), 4, RT_IPC_FLAG_FIFO);
+    RT_ASSERT(disp_data->disp_mq != RT_NULL);
 
     int path = SWITCH_TO_INTERNAL_DPHY;
     ret = rt_device_control(device, RK_DISPLAY_CTRL_MIPI_SWITCH, &path);
@@ -1654,6 +1656,8 @@ rt_display_data_t rt_display_init(struct rt_display_lut *lutA,
     disp_data->yres = WIN_LAYERS_H;
     disp_data->device = device;
 
+    g_disp_data = disp_data;
+
     rt_exit_critical();
 
     return disp_data;
@@ -1665,7 +1669,19 @@ RTM_EXPORT(rt_display_init);
  */
 rt_display_data_t rt_display_get_disp(void)
 {
-    return g_disp_data;
+    rt_uint32_t timeout = 200;
+
+    while (--timeout != 0)
+    {
+        if (g_disp_data != RT_NULL)
+        {
+            return g_disp_data;
+        }
+        rt_thread_delay(1);
+    };
+
+    rt_kprintf("error: rt_display_get_disp fail!\n");
+    return RT_NULL;
 }
 RTM_EXPORT(rt_display_get_disp);
 
@@ -1674,6 +1690,14 @@ RTM_EXPORT(rt_display_get_disp);
  */
 void rt_display_deinit(rt_display_data_t disp_data)
 {
+    rt_err_t ret;
+    do
+    {
+        ret = rt_mq_delete(disp_data->disp_mq);
+        rt_thread_delay(10);
+    }
+    while (ret != RT_EOK);
+
     while (1)
     {
         if (RT_EOK == rt_device_close(disp_data->device))
@@ -1688,4 +1712,98 @@ void rt_display_deinit(rt_display_data_t disp_data)
 }
 RTM_EXPORT(rt_display_deinit);
 
+/*
+ **************************************************************************************************
+ *
+ * rt display thread.
+ *
+ **************************************************************************************************
+ */
+/**
+ * rt display thread.
+ */
+static void rt_display_thread(void *p)
+{
+    rt_err_t ret;
+    struct rt_display_mq_t disp_mq;
+    struct rt_display_config *winhead = RT_NULL;
+    struct rt_display_lut lut0;
+    struct rt_display_data *disp;
+
+    /* init bpp_lut[256] */
+    rt_display_update_lut(FORMAT_RGB_332);
+    lut0.winId = 0;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    lut0.lut  = bpp_lut;
+    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
+    disp = rt_display_init(&lut0, 0, 0);
+    RT_ASSERT(disp != RT_NULL);
+
+    while (1)
+    {
+        ret = rt_mq_recv(disp->disp_mq, &disp_mq, sizeof(struct rt_display_mq_t), RT_WAITING_FOREVER);
+        RT_ASSERT(ret == RT_EOK);
+
+        rt_uint8_t i;
+        winhead = RT_NULL;
+        for (i = 0; i < 3; i++)
+        {
+            if (disp_mq.cfgsta & (0x01 << i))
+            {
+                rt_uint8_t winid;
+                struct rt_display_lut *old_lut;
+                struct rt_display_config *wincfg;
+
+                wincfg  = &disp_mq.win[i];
+                winid   = wincfg->winId;
+                old_lut = &disp->lut[winid];
+                if ((wincfg->format != old_lut->format) || (wincfg->lut != old_lut->lut))
+                {
+                    struct rt_display_lut  lut;
+                    lut.winId  = winid;
+                    lut.format = wincfg->format;
+                    lut.lut    = wincfg->lut;
+                    lut.size   = wincfg->lutsize;
+
+                    if (winid == 0)
+                        ret = rt_display_lutset(&lut, 0, 0);
+                    else if (winid == 1)
+                        ret = rt_display_lutset(0, &lut, 0);
+                    else
+                        ret = rt_display_lutset(0, 0, &lut);
+                    RT_ASSERT(ret == RT_EOK);
+                }
+
+                rt_display_win_layers_list(&winhead, wincfg);
+            }
+        }
+
+        ret = rt_display_win_layers_set(winhead);
+        RT_ASSERT(ret == RT_EOK);
+
+        if (disp_mq.disp_finish)
+        {
+            ret = disp_mq.disp_finish();
+            RT_ASSERT(ret == RT_EOK);
+        }
+    }
+
+    rt_display_deinit(disp);
+    disp = RT_NULL;
+}
+
+/**
+ * olpc clock demo application init.
+ */
+int rt_display_thread_init(void)
+{
+    rt_thread_t rtt_disp;
+
+    rtt_disp = rt_thread_create("disp", rt_display_thread, RT_NULL, 2048, 3, 10);
+    RT_ASSERT(rtt_disp != RT_NULL);
+    rt_thread_startup(rtt_disp);
+
+    return RT_EOK;
+}
+INIT_APP_EXPORT(rt_display_thread_init);
 #endif

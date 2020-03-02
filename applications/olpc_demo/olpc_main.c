@@ -12,34 +12,9 @@
 #include "olpc_display.h"
 #include "olpc_ap.h"
 
-#if defined(RT_USING_TOUCH)
-#include "drv_touch.h"
-#include "olpc_touch.h"
-#endif
-
 #if defined(RT_USING_MODULE)
 #include "dlmodule.h"
 #endif
-
-/**
- * color palette for 1bpp
- */
-static uint32_t bpp1_lut[2] =
-{
-    0x00000000, 0x00ffffff
-};
-
-/*
- **************************************************************************************************
- *
- * Macro define
- *
- **************************************************************************************************
- */
-/* display win layers */
-#define CLOCK_GRAY1_WIN     0
-#define CLOCK_RGB332_WIN    1
-#define CLOCK_RGB565_WIN    2
 
 /*
  **************************************************************************************************
@@ -179,29 +154,6 @@ static void olpc_main_thread(void *p)
 {
     rt_err_t ret;
     uint32_t event;
-    struct rt_display_lut lut0, lut1, lut2;
-    struct rt_display_data *disp;
-
-    /* init bpp_lut[256] */
-    rt_display_update_lut(FORMAT_RGB_332);
-
-    lut0.winId = CLOCK_RGB332_WIN;
-    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
-    lut0.lut  = bpp_lut;
-    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
-
-    lut1.winId = CLOCK_GRAY1_WIN;
-    lut1.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    lut1.lut  = bpp1_lut;
-    lut1.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    lut2.winId = CLOCK_RGB565_WIN;
-    lut2.format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-    lut2.lut  = RT_NULL;
-    lut2.size = 0;
-
-    disp = rt_display_init(&lut0, &lut1, &lut2);
-    RT_ASSERT(disp != RT_NULL);
 
     olpc_main_event = rt_event_create("olpcmain_event", RT_IPC_FLAG_FIFO);
     RT_ASSERT(olpc_main_event != RT_NULL);
@@ -394,9 +346,6 @@ static void olpc_main_thread(void *p)
 
     rt_event_delete(olpc_main_event);
     olpc_main_event = RT_NULL;
-
-    rt_display_deinit(disp);
-    disp = RT_NULL;
 }
 
 /**
@@ -406,7 +355,7 @@ int olpc_main_init(void)
 {
     rt_thread_t rtt_olpcmain;
 
-    rtt_olpcmain = rt_thread_create("olpcmain", olpc_main_thread, RT_NULL, 2048, 5, 10);
+    rtt_olpcmain = rt_thread_create("olpcmain", olpc_main_thread, RT_NULL, 2048, 10, 10);
     RT_ASSERT(rtt_olpcmain != RT_NULL);
     rt_thread_startup(rtt_olpcmain);
 

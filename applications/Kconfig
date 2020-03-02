@@ -44,10 +44,6 @@ if RT_USING_OLPC_DEMO
                 bool "select round disc with Roman number base on RGB565"
         endchoice
 
-        config OLPC_APP_CLOCK_LOOP_LAMP
-            bool "olpc clock loop lamp enable"
-            depends on (!OLPC_APP_CLOCK_BLN_ENABLE) && OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565
-            default n
     endif
 
     config OLPC_APP_EBOOK_ENABLE

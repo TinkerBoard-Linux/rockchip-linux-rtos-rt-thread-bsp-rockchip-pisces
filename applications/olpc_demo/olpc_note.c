@@ -669,6 +669,8 @@ static rt_err_t olpc_note_task_fun(struct olpc_note_data *olpc_data)
 
     rt_memset(&wincfg0, 0, sizeof(struct rt_display_config));
     rt_memset(&wincfg1, 0, sizeof(struct rt_display_config));
+    wincfg0.zpos = WIN_BOTTOM_LAYER;
+    wincfg1.zpos = WIN_TOP_LAYER;
 
     if ((olpc_data->cmd & UPDATE_DRAW) == UPDATE_DRAW)
     {

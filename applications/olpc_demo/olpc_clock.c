@@ -16,6 +16,10 @@
 #include "olpc_touch.h"
 #endif
 
+#if defined(RT_USING_DTCM_HEAP) && defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+#define OLPC_CLOCKBKG_USE_DTCM
+#endif
+
 /**
  * color palette for 1bpp
  */
@@ -33,8 +37,10 @@ static uint32_t bpp1_lut[2] =
  */
 /* display win layers */
 #define CLOCK_GRAY1_WIN     0
-#define CLOCK_RGB332_WIN    1
-#define CLOCK_RGB565_WIN    2
+#define CLOCK_RGB332_WIN    0
+#define CLOCK_RGB565_WIN    0
+#define CLOCKBKG_RGB565_WIN 2
+#define BLN_RGB332_WIN      1
 
 /* display region define */
 #define LAMP_MAX_NUM         8
@@ -103,22 +109,27 @@ static uint32_t bpp1_lut[2] =
 #define FP_FB_H             150
 
 
-/* Event define */
-#define EVENT_UPDATE_CLOCK  (0x01UL << 0)
-#define EVENT_EXIT_CLOCK    (0x01UL << 1)
+/* Event define for 'disp_event' */
+#define EVENT_CLOCK_UPDATE  (0x01UL << 0)
+#define EVENT_CLOCK_EXIT    (0x01UL << 1)
+#define EVENT_CLOCK_DISP    (0x01UL << 2)
 
-/* Command define */
+#define EVENT_BLN_UPDATE    (0x01UL << 3)
+#define EVENT_BLN_DISP      (0x01UL << 4)
+#define EVENT_BLN_EXIT      (0x01UL << 5)
+#define EVENT_BLN_EXIT_DONE (0x01UL << 6)
+
+/* Command define for 'blncmd' */
+#define UPDATE_BLN          (0x01UL << 0)
+
+/* Command define for 'cmd' */
 #define UPDATE_CLOCK        (0x01UL << 0)
 #define UPDATE_MSG          (0x01UL << 1)
 #define UPDATE_HOME         (0x01UL << 2)
 #define UPDATE_FINGERP      (0x01UL << 3)
 #define UPDATE_LOCK         (0x01UL << 4)
-#define UPDATE_LAMP         (0x01UL << 5)
-#define UPDATE_BLN          (0x01UL << 6)
-
-#define MOVE_CLOCK          (0x01UL << 7)
-#define MOVE_MSG            (0x01UL << 8)
-#define MOVE_LAMP           (0x01UL << 9)
+#define MOVE_CLOCK          (0x01UL << 5)
+#define MOVE_MSG            (0x01UL << 6)
 
 /* Screen state define */
 #define SCREEN_OFF          0
@@ -151,88 +162,6 @@ static uint32_t bpp1_lut[2] =
 /*
  **************************************************************************************************
  *
- * Declaration
- *
- **************************************************************************************************
- */
-extern image_info_t lock_bar_info;
-extern image_info_t lock_block_info;
-
-extern image_info_t clock_bkg_info;
-extern image_info_t clock_sec_info;
-extern image_info_t clock_min_info;
-extern image_info_t clock_hour_info;
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-extern image_info_t clock_centre_info;
-#endif
-
-extern image_info_t msg_font_0_info;
-extern image_info_t msg_font_1_info;
-extern image_info_t msg_font_2_info;
-extern image_info_t msg_font_percent_info;
-
-extern image_info_t msg_font_CHN_6_info;
-extern image_info_t msg_font_CHN_day_info;
-extern image_info_t msg_font_CHN_month_info;
-extern image_info_t msg_font_CN_week_info;
-
-extern image_info_t msg_bat5_info;
-extern image_info_t msg_mov3_info;
-
-extern image_info_t msg_music3_info;
-extern image_info_t msg_qq3_info;
-extern image_info_t msg_wb3_info;
-extern image_info_t msg_wx3_info;
-
-extern image_info_t home_backgroung_info;
-extern image_info_t home_arrow1_info;
-extern image_info_t home_lock1_info;
-extern image_info_t home_unlock1_info;
-extern image_info_t home_light1_info;
-extern image_info_t home_cam1_info;
-extern image_info_t home_srlock1_info;
-extern image_info_t home_clock1_info;
-extern image_info_t home_ebook1_info;
-extern image_info_t home_game1_info;
-extern image_info_t home_calc1_info;
-
-extern image_info_t fingerprint0_info;
-extern image_info_t fingerprint1_info;
-extern image_info_t fingerprint2_info;
-extern image_info_t fingerprint3_info;
-
-#if defined(RT_USING_TOUCH)
-static rt_err_t olpc_clock_screen_touch_register(void *parameter);
-static rt_err_t olpc_clock_screen_touch_unregister(void *parameter);
-static rt_err_t olpc_clock_home_touch_register(void *parameter);
-static rt_err_t olpc_clock_home_touch_unregister(void *parameter);
-static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter);
-static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter);
-static rt_err_t olpc_clock_lock_touch_register(void *parameter);
-static rt_err_t olpc_clock_lock_touch_unregister(void *parameter);
-static image_info_t screen_item;
-#endif
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-extern image_info_t clock_lamp0_info;
-extern image_info_t clock_lamp1_info;
-extern image_info_t clock_lamp2_info;
-extern image_info_t clock_lamp3_info;
-extern image_info_t clock_lamp4_info;
-extern image_info_t clock_lamp5_info;
-extern image_info_t clock_lamp6_info;
-extern image_info_t clock_lamp7_info;
-
-static rt_err_t olpc_lamp_init(void *parameter);
-#endif
-
-#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
-static void olpc_bln_timeout(void *parameter);
-#endif
-
-/*
- **************************************************************************************************
- *
  * Global static struct & data define
  *
  **************************************************************************************************
@@ -240,42 +169,33 @@ static void olpc_bln_timeout(void *parameter);
 struct olpc_clock_data
 {
     rt_display_data_t disp;
+    rt_event_t        disp_event;
+
+#if 1 //defined(OLPC_APP_CLOCK_CLOCK_ENABLE)
+    rt_uint32_t cmd;
 
     rt_uint8_t *fb;
     rt_uint32_t fblen;
+#if defined(OLPC_CLOCKBKG_USE_DTCM)
+    rt_uint8_t *bkgfb;
+    rt_uint32_t bkgfblen;
+#endif
+    rt_uint8_t  screen_sta;
 
     rt_timer_t  clock_timer;
     rt_timer_t  src_timer;
     rt_timer_t  fp_timer;
 
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-    rt_uint8_t *lampfb;
-    rt_uint32_t lampfblen;
-    rt_int16_t  lamp_ylast;
-    rt_timer_t  lamp_timer;
-#endif
-
-#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
-    rt_timer_t  bln_timer;
-    rt_uint16_t rotatenum;
-    rt_uint16_t rotatemax;
-#endif
-
-    rt_event_t  disp_event;
-    rt_uint32_t cmd;
-
     rt_uint8_t  hour;
     rt_uint8_t  minute;
     rt_uint8_t  second;
     rt_uint32_t ticks;
-
     rt_uint8_t  month;
     rt_uint8_t  day;
     rt_uint8_t  week;
 
     rt_uint8_t  batval;
     rt_uint32_t moval;
-
     rt_uint8_t  musicval;
     rt_uint8_t  qqval;
     rt_uint8_t  webval;
@@ -298,1123 +218,38 @@ struct olpc_clock_data
 
     rt_int16_t  lock_px;
     rt_int16_t  lock_py;
-
-    rt_uint8_t  screen_sta;
-};
-
-/* 0 ~ 9 */
-static image_info_t *msg_font_num[10] =
-{
-    &msg_font_0_info,
-    &msg_font_1_info,
-    &msg_font_2_info,
-    &msg_font_0_info,
-    &msg_font_0_info,
-    &msg_font_0_info,
-    &msg_font_0_info,
-    &msg_font_0_info,
-    &msg_font_0_info,
-    &msg_font_0_info,
-};
-
-static image_info_t *msg_week_num[7] =
-{
-    &msg_font_CHN_day_info,
-    &msg_font_CHN_day_info,
-    &msg_font_CHN_day_info,
-    &msg_font_CHN_day_info,
-    &msg_font_CHN_day_info,
-    &msg_font_CHN_day_info,
-    &msg_font_CHN_6_info,
-};
-
-static image_info_t *msg_bat_num[5] =
-{
-    &msg_bat5_info,
-    &msg_bat5_info,
-    &msg_bat5_info,
-    &msg_bat5_info,
-    &msg_bat5_info,
-};
-
-static image_info_t *msg_music_num[3] =
-{
-    &msg_music3_info,
-    &msg_music3_info,
-    &msg_music3_info,
-};
-
-static image_info_t *msg_qq_num[3] =
-{
-    &msg_qq3_info,
-    &msg_qq3_info,
-    &msg_qq3_info,
-};
-
-static image_info_t *msg_web_num[3] =
-{
-    &msg_wb3_info,
-    &msg_wb3_info,
-    &msg_wb3_info,
-};
-
-static image_info_t *msg_wx_num[3] =
-{
-    &msg_wx3_info,
-    &msg_wx3_info,
-    &msg_wx3_info,
-};
-
-static image_info_t *home_item[8 + 1] =
-{
-    &home_unlock1_info,
-    &home_light1_info,
-    &home_cam1_info,
-    &home_srlock1_info,
-    &home_clock1_info,
-    &home_ebook1_info,
-    &home_game1_info,
-    &home_calc1_info,
-    RT_NULL,
-};
-
-static image_info_t *fingerprint_item[7] =
-{
-    &fingerprint3_info,
-    &fingerprint2_info,
-    &fingerprint1_info,
-    &fingerprint0_info,
-    &fingerprint1_info,
-    &fingerprint2_info,
-    &fingerprint3_info
-};
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-#define LAMP_VALUE_NULL         0x7f
-static image_info_t *clock_lamp[LAMP_MAX_NUM] =
-{
-    &clock_lamp0_info,
-    &clock_lamp1_info,
-    &clock_lamp2_info,
-    &clock_lamp3_info,
-    &clock_lamp4_info,
-    &clock_lamp5_info,
-    &clock_lamp6_info,
-    &clock_lamp7_info
-};
-
-struct olpc_lamp_t
-{
-    rt_int8_t  up[LAMP_HORIZONTAL_NUM];
-    rt_int8_t  right[LAMP_VERTICAL_NUM];
-    rt_int8_t  down[LAMP_HORIZONTAL_NUM];
-    rt_int8_t  left[LAMP_VERTICAL_NUM];
-};
-struct olpc_lamp_t lamp;
-
-struct olpc_lamp_disp_t
-{
-    rt_slist_t  slist;
-    rt_int16_t  x;
-    rt_int16_t  y;
-    rt_int16_t  w;
-    rt_int16_t  h;
-    rt_int16_t  ylast;
-    rt_int8_t   *buf;
-    rt_uint8_t  id;
-    rt_uint8_t  len;
-    rt_uint8_t  region;
-};
-
-static rt_slist_t glamplist = RT_SLIST_OBJECT_INIT(glamplist);
 #endif
+
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+    rt_uint32_t blncmd;
+    rt_uint8_t *blnfb;
+    rt_uint32_t blnfblen;
+    rt_timer_t  bln_timer;
+    rt_uint16_t rotatenum;
+    rt_uint16_t rotatemax;
+#endif
+};
+
+struct static olpc_clock_data *g_olpc_data = RT_NULL;
 
 /*
  **************************************************************************************************
  *
- * Display clock demo functions
+ * Declaration
  *
  **************************************************************************************************
  */
 
-/**
- * olpc clock lut set.
- */
-static rt_err_t olpc_clock_lutset(void *parameter)
-{
-    rt_err_t ret = RT_EOK;
-    struct rt_display_lut lut0, lut1, lut2;
-
-    lut0.winId = CLOCK_RGB332_WIN;
-    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
-    lut0.lut  = bpp_lut;
-    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
-
-    lut1.winId = CLOCK_GRAY1_WIN;
-    lut1.format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
-    lut1.lut  = bpp1_lut;
-    lut1.size = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
-
-    lut2.winId = CLOCK_RGB565_WIN;
-    lut2.format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
-    lut2.lut  = RT_NULL;
-    lut2.size = 0;
-
-    ret = rt_display_lutset(&lut0, &lut1, &lut2);
-    RT_ASSERT(ret == RT_EOK);
-
-    // clear screen
-    {
-        struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-        rt_device_t device = olpc_data->disp->device;
-        struct rt_device_graphic_info info;
-
-        ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-        RT_ASSERT(ret == RT_EOK);
-
-        rt_display_win_clear(CLOCK_RGB332_WIN, RTGRAPHIC_PIXEL_FORMAT_RGB332, 0, WIN_LAYERS_H, 0);
-    }
-
-    return ret;
-}
-
-/**
- * Clock timer callback.
- */
-static void olpc_clock_timeout(void *parameter)
-{
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    ++olpc_data->second;
-    if (olpc_data->second >= 60)
-    {
-        olpc_data->second = 0;
-        if (++olpc_data->minute == 60)
-        {
-            olpc_data->minute = 0;
-            if (++olpc_data->hour >= 24)
-            {
-                olpc_data->hour = 0;
-
-                if (++olpc_data->week == 7)
-                {
-                    olpc_data->week = 0;
-                }
-
-                if (++olpc_data->day > 31)
-                {
-                    olpc_data->day = 1;
-                    if (++olpc_data->month > 12)
-                    {
-                        olpc_data->month = 1;
-                    }
-                }
-                olpc_data->cmd |= UPDATE_MSG;
-            }
-        }
-
-        if ((olpc_data->minute % 3) == 0)
-        {
-            olpc_data->cmd |= MOVE_CLOCK | UPDATE_CLOCK;
-            olpc_data->cmd |= MOVE_MSG | UPDATE_MSG;
-        }
-    }
-
-    olpc_data->cmd |= UPDATE_CLOCK;
-    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-}
-
-/**
- * Screen timeout timer callback.
- */
-static void olpc_screen_timeout(void *parameter)
-{
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    if (olpc_data->screen_sta == SCREEN_HOME)
-    {
-        olpc_clock_home_touch_unregister(olpc_data);
-        olpc_clock_fingerprint_touch_unregister(olpc_data);
-
-        olpc_data->screen_sta = SCREEN_OFF;
-        olpc_data->cmd |= UPDATE_HOME | UPDATE_FINGERP;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-    }
-    else if (olpc_data->screen_sta == SCREEN_LOCK)
-    {
-        olpc_clock_lock_touch_unregister(olpc_data);
-
-        olpc_data->screen_sta = SCREEN_OFF;
-        olpc_data->cmd |= UPDATE_LOCK;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-    }
-
-    olpc_data->screen_sta = SCREEN_OFF;
-}
-
-/**
- * Fingerprint refresh timer callback.
- */
-static void olpc_fp_timeout(void *parameter)
-{
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    olpc_data->fp_id++;
-    olpc_data->cmd |= UPDATE_FINGERP;
-    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-    if (olpc_data->fp_id >= 6)
-    {
-        rt_timer_stop(olpc_data->fp_timer);
-    }
-}
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-/**
- * Fingerprint refresh timer callback.
- */
-static void olpc_lamp_timeout(void *parameter)
-{
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    olpc_data->cmd |= MOVE_LAMP;
-    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-}
+#if defined(RT_USING_TOUCH)
+static rt_err_t olpc_clock_screen_touch_register(void *parameter);
+static rt_err_t olpc_clock_screen_touch_unregister(void *parameter);
+static rt_err_t olpc_clock_home_touch_register(void *parameter);
+static rt_err_t olpc_clock_home_touch_unregister(void *parameter);
+static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter);
+static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter);
+static rt_err_t olpc_clock_lock_touch_register(void *parameter);
+static rt_err_t olpc_clock_lock_touch_unregister(void *parameter);
 #endif
-
-/**
- * Display clock demo init.
- */
-static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
-{
-    rt_err_t    ret;
-    rt_device_t device = olpc_data->disp->device;
-    struct rt_device_graphic_info info;
-
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
-
-    olpc_data->hour = 3;
-    olpc_data->minute = 30;
-    olpc_data->second = 0;
-    olpc_data->ticks = 0;
-    olpc_data->day = 2;
-    olpc_data->month = 12;
-    olpc_data->week = 6;
-
-    olpc_data->batval = 21;
-    olpc_data->moval = 100121;
-    olpc_data->musicval = 2;
-    olpc_data->qqval = 2;
-    olpc_data->webval = 2;
-    olpc_data->wexval = 2;
-
-    olpc_data->clock_xoffset = 0;
-    olpc_data->clock_yoffset = 0;
-    olpc_data->clock_xdir = -1;
-    olpc_data->clock_ydir = -1;
-    olpc_data->clock_ylast = CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2;
-
-    olpc_data->msg_xoffset = 0;
-    olpc_data->msg_yoffset = 0;
-    olpc_data->msg_xdir = 1;
-    olpc_data->msg_ydir = 1;
-    olpc_data->msg_ylast = MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2;
-
-    olpc_data->home_id = 0;
-    olpc_data->fp_id = 0;
-    olpc_data->screen_sta = SCREEN_OFF;
-
-    olpc_data->cmd = UPDATE_CLOCK | UPDATE_MSG;
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-    olpc_data->lampfblen = LAMP_FB_W * LAMP_FB_H;
-    olpc_data->lampfb    = (rt_uint8_t *)rt_malloc_large(olpc_data->lampfblen);
-    RT_ASSERT(olpc_data->lampfb != RT_NULL);
-#endif
-
-#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-    olpc_data->fblen = CLOCK_FB_W * CLOCK_FB_H * 2;
-#else
-    olpc_data->fblen = CLOCK_FB_W * CLOCK_FB_H;
-#endif
-    olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
-    RT_ASSERT(olpc_data->fb != RT_NULL);
-
-    // create sreen touch timer
-    olpc_data->src_timer = rt_timer_create("srctimer",
-                                           olpc_screen_timeout,
-                                           (void *)olpc_data,
-                                           SCREEN_HOLD_TIME,
-                                           RT_TIMER_FLAG_ONE_SHOT);
-    RT_ASSERT(olpc_data->src_timer != RT_NULL);
-
-    // create fp touch timer
-    olpc_data->fp_timer = rt_timer_create("fptimer",
-                                          olpc_fp_timeout,
-                                          (void *)olpc_data,
-                                          FP_LOOP_TIME,
-                                          RT_TIMER_FLAG_PERIODIC);
-    RT_ASSERT(olpc_data->fp_timer != RT_NULL);
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-    olpc_lamp_init(olpc_data);
-    // create lamp timer
-    olpc_data->lamp_timer = rt_timer_create("lamptimer",
-                                            olpc_lamp_timeout,
-                                            (void *)olpc_data,
-                                            LAMP_LOOP_TIME,
-                                            RT_TIMER_FLAG_PERIODIC);
-    RT_ASSERT(olpc_data->lamp_timer != RT_NULL);
-    rt_timer_start(olpc_data->lamp_timer);
-#endif
-
-#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
-    // create breathlight timer
-    olpc_data->bln_timer = rt_timer_create("blntimer",
-                                           olpc_bln_timeout,
-                                           (void *)olpc_data,
-                                           BLN_ROTATE_TICKS,
-                                           RT_TIMER_FLAG_ONE_SHOT);
-    RT_ASSERT(olpc_data->bln_timer != RT_NULL);
-    rt_timer_start(olpc_data->bln_timer);
-#endif
-
-    // create clock timer
-    olpc_data->clock_timer = rt_timer_create("clocktimer",
-                             olpc_clock_timeout,
-                             (void *)olpc_data,
-                             CLOCK_UPDATE_TIME,
-                             RT_TIMER_FLAG_PERIODIC);
-    RT_ASSERT(olpc_data->clock_timer != RT_NULL);
-    rt_timer_start(olpc_data->clock_timer);
-
-    return RT_EOK;
-}
-
-/**
- * Display clock demo deinit.
- */
-static void olpc_clock_deinit(struct olpc_clock_data *olpc_data)
-{
-    rt_err_t ret;
-
-#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
-    rt_timer_stop(olpc_data->bln_timer);
-    ret = rt_timer_delete(olpc_data->bln_timer);
-    RT_ASSERT(ret == RT_EOK);
-    olpc_data->bln_timer = RT_NULL;
-#endif
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-    rt_timer_stop(olpc_data->lamp_timer);
-    ret = rt_timer_delete(olpc_data->lamp_timer);
-    RT_ASSERT(ret == RT_EOK);
-    olpc_data->lamp_timer = RT_NULL;
-#endif
-
-    rt_timer_stop(olpc_data->fp_timer);
-    ret = rt_timer_delete(olpc_data->fp_timer);
-    RT_ASSERT(ret == RT_EOK);
-    olpc_data->fp_timer = RT_NULL;
-
-    rt_timer_stop(olpc_data->src_timer);
-    ret = rt_timer_delete(olpc_data->src_timer);
-    RT_ASSERT(ret == RT_EOK);
-    olpc_data->src_timer = RT_NULL;
-
-    ret = rt_timer_stop(olpc_data->clock_timer);
-    RT_ASSERT(ret == RT_EOK);
-
-    ret = rt_timer_delete(olpc_data->clock_timer);
-    RT_ASSERT(ret == RT_EOK);
-    olpc_data->clock_timer = RT_NULL;
-
-    rt_free_large((void *)olpc_data->fb);
-    olpc_data->fb = RT_NULL;
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-    //clear list
-    {
-        rt_slist_t *list = RT_NULL;
-        struct olpc_lamp_disp_t *lamp = RT_NULL;
-        rt_slist_for_each(list, &glamplist)
-        {
-            lamp = (struct olpc_lamp_disp_t *)list;
-            rt_slist_remove(&glamplist, list);
-            rt_free(lamp);
-        }
-    }
-
-    rt_free_large((void *)olpc_data->lampfb);
-    olpc_data->lampfb = RT_NULL;
-#endif
-}
-
-/*
- **************************************************************************************************
- *
- * lamp functions
- *
- **************************************************************************************************
- */
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-
-/**
- * lamp table init.
- */
-static rt_err_t olpc_lamp_init(void *parameter)
-{
-    rt_int16_t i;
-
-    // up line
-    for (i = 0; i < LAMP_HORIZONTAL_NUM; i++)
-    {
-        if (i < LAMP_MAX_NUM)
-        {
-            lamp.up[i] = i;
-        }
-        else
-        {
-            lamp.up[i] = LAMP_VALUE_NULL;
-        }
-    }
-
-    // right line
-    for (i = 0; i < LAMP_VERTICAL_NUM; i++)
-    {
-        if ((i + LAMP_HORIZONTAL_NUM) < LAMP_MAX_NUM)
-        {
-            lamp.right[i] = i;
-        }
-        else
-        {
-            lamp.right[i] = LAMP_VALUE_NULL;
-        }
-    }
-
-    // down line
-    for (i = 0; i < LAMP_HORIZONTAL_NUM; i++)
-    {
-        if ((i + LAMP_HORIZONTAL_NUM + LAMP_VERTICAL_NUM) < LAMP_MAX_NUM)
-        {
-            lamp.down[i] = i;
-        }
-        else
-        {
-            lamp.down[i] = LAMP_VALUE_NULL;
-        }
-    }
-
-    // left line
-    for (i = 0; i < LAMP_VERTICAL_NUM; i++)
-    {
-        if ((i + LAMP_HORIZONTAL_NUM + LAMP_VERTICAL_NUM + LAMP_HORIZONTAL_NUM) < LAMP_MAX_NUM)
-        {
-            lamp.left[i] = i;
-        }
-        else
-        {
-            lamp.left[i] = LAMP_VALUE_NULL;
-        }
-    }
-
-    return RT_EOK;
-}
-
-/**
- * lamp move.
- */
-static rt_err_t olpc_lamp_move(void *parameter)
-{
-    rt_int16_t i;
-    rt_int8_t  temp = lamp.left[0];
-
-    // left line
-    for (i = 0; i < LAMP_VERTICAL_NUM - 1; i++)
-    {
-        lamp.left[i] = lamp.left[i + 1];
-    }
-    lamp.left[i] = lamp.down[0];
-
-    // down line
-    for (i = 0; i < LAMP_HORIZONTAL_NUM - 1; i++)
-    {
-        lamp.down[i] = lamp.down[i + 1];
-    }
-    lamp.down[i] = lamp.right[LAMP_VERTICAL_NUM - 1];
-
-    // right line
-    for (i = LAMP_VERTICAL_NUM - 1; i > 0 ; i--)
-    {
-        lamp.right[i] = lamp.right[i - 1];
-    }
-    lamp.right[i] = lamp.up[LAMP_HORIZONTAL_NUM - 1];
-
-    // up line
-    for (i = LAMP_HORIZONTAL_NUM - 1; i > 0 ; i--)
-    {
-        lamp.up[i] = lamp.up[i - 1];
-    }
-    lamp.up[i] = temp;
-
-    return RT_EOK;
-}
-
-/**
- * clock & lamp region overlay check.
- */
-static rt_err_t olpc_lamp_clock_overlay_check(struct olpc_clock_data *olpc_data, rt_int16_t y, rt_int16_t ylast, rt_int16_t h)
-{
-    rt_err_t ret = RT_EOK;
-    struct rt_device_graphic_info info;
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    ret = olpc_display_overlay_check(MIN(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y,
-                                     MAX(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y + h * LAMP_VERTICAL_STEP - LAMP_VERTICAL_DIFF,
-                                     MIN(CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2 + olpc_data->clock_yoffset, olpc_data->clock_ylast),
-                                     MAX(CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2 + olpc_data->clock_yoffset, olpc_data->clock_ylast) + CLOCK_FB_H);
-
-    return ret;
-}
-
-/**
- * msg & lamp region overlay check.
- */
-static rt_err_t olpc_lamp_msg_overlay_check(struct olpc_clock_data *olpc_data, rt_int16_t y, rt_int16_t ylast, rt_int16_t h)
-{
-    rt_err_t ret = RT_EOK;
-    struct rt_device_graphic_info info;
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    ret = olpc_display_overlay_check(MIN(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y,
-                                     MAX(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y + h * LAMP_VERTICAL_STEP - LAMP_VERTICAL_DIFF,
-                                     MIN(MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2 + olpc_data->msg_yoffset, olpc_data->msg_ylast),
-                                     MAX(MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2 + olpc_data->msg_yoffset, olpc_data->msg_ylast) + MSG_FB_H);
-
-    return ret;
-}
-
-/**
- * home & lamp region overlay check.
- */
-static rt_err_t olpc_lamp_home_overlay_check(struct olpc_clock_data *olpc_data, rt_int16_t y, rt_int16_t ylast, rt_int16_t h)
-{
-    rt_err_t ret = RT_EOK;
-    struct rt_device_graphic_info info;
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    if (olpc_data->screen_sta == SCREEN_HOME)
-    {
-        ret = olpc_display_overlay_check(MIN(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y,
-                                         MAX(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y + h * LAMP_VERTICAL_STEP - LAMP_VERTICAL_DIFF,
-                                         HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2,
-                                         HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2 + HOME_FB_H);
-    }
-
-    return ret;
-}
-
-/**
- * fp & lamp region overlay check.
- */
-static rt_err_t olpc_lamp_fp_overlay_check(struct olpc_clock_data *olpc_data, rt_int16_t y, rt_int16_t ylast, rt_int16_t h)
-{
-    rt_err_t ret = RT_EOK;
-    struct rt_device_graphic_info info;
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    if (olpc_data->screen_sta == SCREEN_HOME)
-    {
-        ret = olpc_display_overlay_check(MIN(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y,
-                                         MAX(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y + h * LAMP_VERTICAL_STEP - LAMP_VERTICAL_DIFF,
-                                         FP_REGION_Y + (FP_REGION_H - FP_FB_H) / 2,
-                                         FP_REGION_Y + (FP_REGION_H - FP_FB_H) / 2 + FP_FB_H);
-    }
-
-    return ret;
-}
-
-/**
- * lock & lamp region overlay check.
- */
-static rt_err_t olpc_lamp_lock_overlay_check(struct olpc_clock_data *olpc_data, rt_int16_t y, rt_int16_t ylast, rt_int16_t h)
-{
-    rt_err_t ret = RT_EOK;
-    struct rt_device_graphic_info info;
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    if (olpc_data->screen_sta == SCREEN_LOCK)
-    {
-        ret = olpc_display_overlay_check(MIN(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y,
-                                         MAX(y, ylast) * LAMP_VERTICAL_STEP + LAMP_REGION_Y + h * LAMP_VERTICAL_STEP - LAMP_VERTICAL_DIFF,
-                                         LOCK_REGION_Y + (LOCK_REGION_H - LOCK_FB_H) / 2,
-                                         LOCK_REGION_Y + (LOCK_REGION_H - LOCK_FB_H) / 2 + LOCK_FB_H);
-    }
-
-    return ret;
-}
-
-/**
- * get lamp node by region ID.
- */
-static struct olpc_lamp_disp_t *olpc_lampnode_get_by_region(rt_uint8_t regionid)
-{
-    rt_slist_t *list = RT_NULL;
-    struct olpc_lamp_disp_t *lamp = RT_NULL;
-
-    rt_slist_for_each(list, &glamplist)
-    {
-        lamp = (struct olpc_lamp_disp_t *)list;
-        if (lamp->region == regionid)
-        {
-            return lamp;
-        }
-    }
-
-    return RT_NULL;
-}
-
-/**
- * create a new node of lamplist.
- */
-static struct olpc_lamp_disp_t *olpc_lamplist_new(rt_uint8_t pos, rt_int16_t start, rt_uint8_t region)
-{
-    struct olpc_lamp_disp_t *plamp;
-
-    plamp = rt_malloc(sizeof(struct olpc_lamp_disp_t));
-    rt_memset(plamp, 0, sizeof(struct olpc_lamp_disp_t));
-    rt_slist_append(&glamplist, &plamp->slist);
-
-    if (pos == LAMP_POS_TOP)
-    {
-        plamp->buf   = lamp.up;
-        plamp->id    = start;
-        plamp->x     = start;
-        plamp->y     = 0;
-        plamp->ylast = plamp->y;
-        if (lamp.up[0] == 0)
-        {
-            plamp->ylast = plamp->y + 1;
-        }
-    }
-    else if (pos == LAMP_POS_RIGHT)
-    {
-        plamp->buf   = lamp.right;
-        plamp->id    = start;
-        plamp->x     = LAMP_HORIZONTAL_NUM - 1;
-        plamp->y     = start + 1;
-        plamp->ylast = plamp->y;
-        plamp->w     = 1;
-        if (lamp.right[start] == 0)
-        {
-            plamp->ylast = plamp->y - 1;
-        }
-    }
-    else if (pos == LAMP_POS_BOTTOM)
-    {
-        plamp->buf   = lamp.down;
-        plamp->id    = start;
-        plamp->x     = start;
-        plamp->y     = LAMP_VERTICAL_NUM + 1;;
-        plamp->ylast = plamp->y;
-        if (lamp.down[LAMP_HORIZONTAL_NUM - 1] == 0)
-        {
-            plamp->ylast = plamp->y - 1;
-        }
-    }
-    else /* if (pos == LAMP_POS_LEFT) */
-    {
-        plamp->buf   = lamp.left;
-        plamp->id    = start;
-        plamp->x     = 0;
-        plamp->y     = start + 1;
-        plamp->ylast = plamp->y;
-        plamp->w     = 1;
-        if ((lamp.left[LAMP_VERTICAL_NUM - 1] == 0) || (lamp.left[LAMP_VERTICAL_NUM - 1] == LAMP_VALUE_NULL))
-        {
-            plamp->ylast = plamp->y + 1;
-        }
-    }
-
-    plamp->region = region;
-
-    return plamp;
-}
-
-/**
- * create lamp list.
- */
-static rt_err_t olpc_lamplist_create(void *parameter)
-{
-    struct olpc_clock_data  *olpc_data = (struct olpc_clock_data *)parameter;
-    struct olpc_lamp_disp_t *plamp = RT_NULL;
-    rt_int16_t start, end;
-
-    rt_slist_init(&glamplist);
-
-    // top line check
-    for (start = 0; start < LAMP_HORIZONTAL_NUM; start++)
-    {
-        if (lamp.up[start] != LAMP_VALUE_NULL)
-        {
-            plamp = olpc_lamplist_new(LAMP_POS_TOP, start, REGION_ID_NULL);
-
-            for (end = start; end < LAMP_HORIZONTAL_NUM; end++)
-            {
-                if (lamp.up[end] == LAMP_VALUE_NULL)
-                    break;
-            }
-
-            plamp->len = end - start;
-            plamp->w   = plamp->len;
-            plamp->h   = 1;
-
-            if (RT_EOK != olpc_lamp_clock_overlay_check(olpc_data, plamp->y, plamp->ylast, 1))
-            {
-                plamp->region = REGION_ID_CLOCK;
-            }
-            break;
-        }
-    }
-
-    // right line check
-    for (start = 0; start < LAMP_VERTICAL_NUM; start++)
-    {
-        if (lamp.right[start] != LAMP_VALUE_NULL)
-        {
-            plamp = olpc_lamplist_new(LAMP_POS_RIGHT, start, REGION_ID_NULL);
-
-            for (end = start; end < LAMP_VERTICAL_NUM; end++)
-            {
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_CLOCK)) &&
-                        (RT_EOK  != olpc_lamp_clock_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_RIGHT, start, REGION_ID_CLOCK);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_MSG)) &&
-                        (RT_EOK  != olpc_lamp_msg_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_RIGHT, start, REGION_ID_MSG);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_HOME)) &&
-                        (RT_EOK  != olpc_lamp_home_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_RIGHT, start, REGION_ID_HOME);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_FP)) &&
-                        (RT_EOK  != olpc_lamp_fp_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_RIGHT, start, REGION_ID_FP);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_LOCK)) &&
-                        (RT_EOK  != olpc_lamp_lock_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_RIGHT, start, REGION_ID_LOCK);
-                }
-
-                if (lamp.right[end] == LAMP_VALUE_NULL)
-                {
-                    break;
-                }
-            }
-            plamp->len = end - start;
-            plamp->h   = plamp->len;
-
-            break;
-        }
-    }
-
-    // bottom line check
-    for (start = 0; start < LAMP_HORIZONTAL_NUM; start++)
-    {
-        if (lamp.down[start] != LAMP_VALUE_NULL)
-        {
-            plamp = olpc_lamplist_new(LAMP_POS_BOTTOM, start, REGION_ID_NULL);
-
-            for (end = start; end < LAMP_HORIZONTAL_NUM; end++)
-            {
-                if (lamp.down[end] == LAMP_VALUE_NULL)
-                    break;
-            }
-
-            plamp->len = end - start;
-            plamp->w   = plamp->len;
-            plamp->h   = 1;
-
-            if (RT_EOK != olpc_lamp_fp_overlay_check(olpc_data, plamp->y, plamp->ylast, 1))
-            {
-                plamp->region = REGION_ID_FP;
-            }
-            break;
-        }
-    }
-
-    // left line check
-    for (start = 0; start < LAMP_VERTICAL_NUM; start++)
-    {
-        if (lamp.left[start] != LAMP_VALUE_NULL)
-        {
-            plamp = olpc_lamplist_new(LAMP_POS_LEFT, start, REGION_ID_NULL);
-
-            for (end = start; end < LAMP_VERTICAL_NUM; end++)
-            {
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_CLOCK)) &&
-                        (RT_EOK  != olpc_lamp_clock_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_LEFT, start, REGION_ID_CLOCK);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_MSG)) &&
-                        (RT_EOK  != olpc_lamp_msg_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_LEFT, start, REGION_ID_MSG);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_HOME)) &&
-                        (RT_EOK  != olpc_lamp_home_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_LEFT, start, REGION_ID_HOME);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_FP)) &&
-                        (RT_EOK  != olpc_lamp_fp_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_LEFT, start, REGION_ID_FP);
-                }
-
-                if ((RT_NULL == olpc_lampnode_get_by_region(REGION_ID_LOCK)) &&
-                        (RT_EOK  != olpc_lamp_lock_overlay_check(olpc_data, plamp->y, plamp->ylast, end - start + 1)))
-                {
-                    plamp->len = end - start;
-                    plamp->h   = plamp->len;
-
-                    start = end;
-                    plamp = olpc_lamplist_new(LAMP_POS_LEFT, start, REGION_ID_LOCK);
-                }
-
-                if (lamp.left[end] == LAMP_VALUE_NULL)
-                {
-                    break;
-                }
-            }
-            plamp->len = end - start;
-            plamp->h   = plamp->len;
-
-            break;
-        }
-    }
-
-    // clear invalid list
-    {
-        rt_slist_t *list = RT_NULL;
-        struct olpc_lamp_disp_t *lamp = RT_NULL;
-
-        rt_slist_for_each(list, &glamplist)
-        {
-            lamp = (struct olpc_lamp_disp_t *)list;
-            if (lamp->len == 0)
-            {
-                rt_slist_remove(&glamplist, list);
-                rt_free(lamp);
-            }
-        }
-    }
-
-#if 0
-    {
-        rt_slist_t *list = RT_NULL;
-        struct olpc_lamp_disp_t *lamp = RT_NULL;
-
-        rt_kprintf("\n---------------------------------------------\n");
-        rt_slist_for_each(list, &glamplist)
-        {
-            lamp = (struct olpc_lamp_disp_t *)list;
-            rt_kprintf("region = %d, x = %d, y = %d, ylast = %d, w = %d, h = %d, id = %d, len = %d\n",
-                       lamp->region, lamp->x, lamp->y, lamp->ylast, lamp->w, lamp->h, lamp->id, lamp->len);
-        }
-        rt_kprintf("\---------------------------------------------\n");
-    }
-#endif
-
-    return RT_EOK;
-}
-
-/**
- * Check is if a region overlapped with lamp, and create lamp node for region & lamp overlay
- */
-static rt_err_t olpc_lamp_region_overlay_check(void *parameter, struct olpc_lamp_disp_t *plamp, rt_uint8_t region)
-{
-    struct olpc_clock_data  *olpc_data = (struct olpc_clock_data *)parameter;
-    rt_int16_t i, start, end;
-
-    rt_memset(plamp, 0, sizeof(struct olpc_lamp_disp_t));
-
-    for (i = 0; i < 2; i++)
-    {
-        if (i == 0)
-        {
-            plamp->buf   = lamp.right;
-            plamp->x     = LAMP_HORIZONTAL_NUM - 1;
-        }
-        else
-        {
-            plamp->buf   = lamp.left;
-            plamp->x     = 0;
-        }
-
-        plamp->w     = 1;
-        for (start = 0; start < LAMP_VERTICAL_NUM; start++)
-        {
-            if (plamp->buf[start] != LAMP_VALUE_NULL)
-                break;
-        }
-        for (; start < LAMP_VERTICAL_NUM; start++)
-        {
-            if (plamp->buf[start] == LAMP_VALUE_NULL)
-            {
-                break;
-            }
-            if (((region == REGION_ID_CLOCK) && (RT_EOK != olpc_lamp_clock_overlay_check(olpc_data, start + 1, start + 1, 1))) ||
-                    ((region == REGION_ID_MSG) && (RT_EOK  != olpc_lamp_msg_overlay_check(olpc_data, start + 1, start + 1, 1)))    ||
-                    ((region == REGION_ID_HOME) && (RT_EOK  != olpc_lamp_home_overlay_check(olpc_data, start + 1, start + 1, 1)))  ||
-                    ((region == REGION_ID_FP) && (RT_EOK  != olpc_lamp_fp_overlay_check(olpc_data, start + 1, start + 1, 1)))      ||
-                    ((region == REGION_ID_LOCK) && (RT_EOK  != olpc_lamp_lock_overlay_check(olpc_data, start + 1, start + 1, 1))))
-            {
-                plamp->region = region;
-                break;
-            }
-        }
-        if (plamp->region != RT_NULL)
-        {
-            plamp->id    = start;
-            plamp->y     = start + 1;
-            plamp->ylast = plamp->y;
-            for (end = start; end < LAMP_VERTICAL_NUM; end++)
-            {
-                if (plamp->buf[end] == LAMP_VALUE_NULL)
-                {
-                    break;
-                }
-
-                if (((plamp->region == REGION_ID_CLOCK) && (RT_EOK == olpc_lamp_clock_overlay_check(olpc_data, end + 1, end + 1, 1))) ||
-                        ((plamp->region == REGION_ID_MSG) && (RT_EOK == olpc_lamp_msg_overlay_check(olpc_data, end + 1, end + 1, 1)))     ||
-                        ((plamp->region == REGION_ID_HOME) && (RT_EOK == olpc_lamp_home_overlay_check(olpc_data, end + 1, end + 1, 1)))   ||
-                        ((plamp->region == REGION_ID_FP) && (RT_EOK == olpc_lamp_fp_overlay_check(olpc_data, end + 1, end + 1, 1)))       ||
-                        ((plamp->region == REGION_ID_LOCK) && (RT_EOK == olpc_lamp_lock_overlay_check(olpc_data, end + 1, end + 1, 1))))
-                {
-                    break;
-                }
-            }
-            plamp->len = end - start;
-            plamp->h   = plamp->len;
-
-            //rt_kprintf("region = %d, x = %d, y = %d, ylast = %d, w = %d, h = %d, id = %d, len = %d\n",
-            //           plamp->region, plamp->x, plamp->y, plamp->ylast, plamp->w, plamp->h, plamp->id, plamp->len);
-            return RT_EOK;
-        }
-    }
-
-    return RT_ERROR;
-}
-
-/**
- * lamp region refresh.
- */
-static rt_err_t olpc_clock_lamp_refresh(struct olpc_clock_data *olpc_data,
-                                        struct rt_display_config *wincfg,
-                                        struct olpc_lamp_disp_t *lamplist)
-{
-    rt_err_t ret;
-    rt_int16_t   i;
-    rt_int16_t   xoffset, yoffset;
-    image_info_t *img_info = NULL;
-    rt_device_t  device = olpc_data->disp->device;
-    struct rt_device_graphic_info info;
-
-    RT_ASSERT(lamplist != RT_NULL);
-    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
-    RT_ASSERT(ret == RT_EOK);
-
-    img_info = clock_lamp[0];
-    wincfg->winId = CLOCK_RGB332_WIN;
-    wincfg->fb    = olpc_data->lampfb;
-    wincfg->x     = LAMP_REGION_X + lamplist->x * LAMP_HORIZONTAL_STEP;
-    wincfg->y     = LAMP_REGION_Y + lamplist->y * LAMP_VERTICAL_STEP;
-    wincfg->ylast = LAMP_REGION_Y + lamplist->ylast * LAMP_VERTICAL_STEP;
-    wincfg->w     = (((lamplist->w * LAMP_HORIZONTAL_STEP - LAMP_HORIZONTAL_DIFF) + 3) / 4) * 4;
-    wincfg->h     = (((lamplist->h * LAMP_VERTICAL_STEP - LAMP_VERTICAL_DIFF) + 1) / 2) * 2;
-    wincfg->fblen = wincfg->w * wincfg->h;
-
-    //rt_kprintf("w = %d, h = %d, id = %d, len = %d, %d, %d\n", lamplist->w, lamplist->h, lamplist->id, lamplist->len, wincfg->w, wincfg->h);
-    RT_ASSERT((wincfg->w % 4) == 0);
-    RT_ASSERT((wincfg->y % 2) == 0);
-    RT_ASSERT((wincfg->h % 2) == 0);
-    RT_ASSERT(wincfg->fblen <= olpc_data->lampfblen);
-    rt_memset(wincfg->fb, 0, wincfg->fblen);
-
-    for (i = lamplist->id; i < lamplist->id + lamplist->len; i ++)
-    {
-        RT_ASSERT(lamplist->buf[i] < LAMP_MAX_NUM);
-        img_info = clock_lamp[lamplist->buf[i]];
-
-        xoffset = 0;
-        yoffset = 0;
-        if (lamplist->w > 1)
-        {
-            xoffset = (i - lamplist->id) * LAMP_HORIZONTAL_STEP;
-        }
-        if (lamplist->h > 1)
-        {
-            yoffset = (i - lamplist->id) * LAMP_VERTICAL_STEP;
-        }
-        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
-    }
-
-    return RT_EOK;
-}
-#endif
-
 
 /*
  **************************************************************************************************
@@ -1494,8 +329,8 @@ static void olpc_bln_timeout(void *parameter)
     //if (olpc_data->rotatenum * BLN_ROTATE_TICKS < BLN_ROTATE_TIME)
     if (olpc_data->rotatenum < BLN_ITEM_MAX)
     {
-        olpc_data->cmd |= UPDATE_BLN;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        olpc_data->blncmd |= UPDATE_BLN;
+        rt_event_send(olpc_data->disp_event, EVENT_BLN_UPDATE);
 
         olpc_data->rotatenum += OLPC_ROTATE_PARAM_STEP;
         if (olpc_data->rotatenum < BLN_ITEM_MAX)
@@ -1511,8 +346,8 @@ static void olpc_bln_timeout(void *parameter)
     else
     {
         olpc_data->rotatenum = 0;
-        olpc_data->cmd |= UPDATE_BLN;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        olpc_data->blncmd |= UPDATE_BLN;
+        rt_event_send(olpc_data->disp_event, EVENT_BLN_UPDATE);
         olpc_data->rotatenum += OLPC_ROTATE_PARAM_STEP;
     }
 
@@ -1535,8 +370,11 @@ static rt_err_t olpc_clock_bln_region_refresh(struct olpc_clock_data *olpc_data,
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    wincfg->winId = CLOCK_RGB332_WIN;
-    wincfg->fb    = olpc_data->fb;
+    wincfg->winId = BLN_RGB332_WIN;
+    wincfg->format  = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    wincfg->lut     = bpp_lut;
+    wincfg->lutsize = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
+    wincfg->fb    = olpc_data->blnfb;
     wincfg->w     = ((BLN_FB_W + 3) / 4) * 4;
     wincfg->h     = BLN_FB_H;
     wincfg->fblen = wincfg->w * wincfg->h;
@@ -1547,7 +385,7 @@ static rt_err_t olpc_clock_bln_region_refresh(struct olpc_clock_data *olpc_data,
 
     RT_ASSERT((wincfg->w % 4) == 0);
     RT_ASSERT((wincfg->h % 2) == 0);
-    RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
+    RT_ASSERT(wincfg->fblen <= olpc_data->blnfblen);
 
     rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
 
@@ -1561,7 +399,7 @@ static rt_err_t olpc_clock_bln_region_refresh(struct olpc_clock_data *olpc_data,
         {
             olpc_data->rotatenum--;
         }
-        img_info = bln_item[olpc_data->rotatenum];
+        img_info = (image_info_t *)bln_item[olpc_data->rotatenum];
         RT_ASSERT(img_info->w <= wincfg->w);
         RT_ASSERT(img_info->h <= wincfg->h);
 
@@ -1572,15 +410,184 @@ static rt_err_t olpc_clock_bln_region_refresh(struct olpc_clock_data *olpc_data,
 
     return RT_EOK;
 }
+
+/**
+ * breathlight display finish callback.
+ */
+static rt_err_t olpc_bln_disp_finish(void)
+{
+    rt_err_t ret;
+
+    ret = rt_event_send(g_olpc_data->disp_event, EVENT_BLN_DISP);
+
+    return ret;
+}
+
+/**
+ * breathlight display wait finish.
+ */
+static rt_err_t olpc_bln_disp_wait(void)
+{
+    rt_err_t ret;
+    uint32_t event;
+
+    ret = rt_event_recv(g_olpc_data->disp_event, EVENT_BLN_DISP,
+                        RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
+                        RT_WAITING_FOREVER, &event);
+    RT_ASSERT(ret == RT_EOK);
+
+    return RT_EOK;
+}
+
+/**
+ * breathlight message process function.
+ */
+static rt_err_t olpc_bln_task_fun(struct olpc_clock_data *olpc_data)
+{
+    rt_err_t ret;
+    struct rt_display_mq_t disp_mq;
+    rt_uint32_t updatecmd = olpc_data->blncmd;
+
+    rt_memset(&disp_mq, 0, sizeof(struct rt_display_mq_t));
+    disp_mq.win[0].zpos = WIN_TOP_LAYER;
+
+    if ((updatecmd & UPDATE_BLN) == UPDATE_BLN)
+    {
+        updatecmd &= ~UPDATE_BLN;
+
+        ret = olpc_clock_bln_region_refresh(olpc_data, &disp_mq.win[0]);
+        RT_ASSERT(ret == RT_EOK);
+        disp_mq.cfgsta |= (0x01 << 0);
+    }
+
+    if (disp_mq.cfgsta)
+    {
+        disp_mq.disp_finish = olpc_bln_disp_finish;
+        ret = rt_mq_send(olpc_data->disp->disp_mq, &disp_mq, sizeof(struct rt_display_mq_t));
+        RT_ASSERT(ret == RT_EOK);
+        olpc_bln_disp_wait();
+    }
+
+    return RT_EOK;
+}
+
+/**
+ * breathlight thread.
+ */
+static void olpc_bln_thread(void *p)
+{
+    rt_err_t ret;
+    uint32_t event;
+    struct olpc_clock_data *olpc_data = g_olpc_data;
+
+    olpc_data->blnfblen = BLN_FB_W * BLN_FB_H;
+    olpc_data->blnfb    = (rt_uint8_t *)rt_malloc_large(olpc_data->blnfblen);
+    RT_ASSERT(olpc_data->blnfb != RT_NULL);
+
+    olpc_data->bln_timer = rt_timer_create("blntimer",
+                                           olpc_bln_timeout,
+                                           (void *)olpc_data,
+                                           BLN_ROTATE_TICKS,
+                                           RT_TIMER_FLAG_ONE_SHOT);
+    RT_ASSERT(olpc_data->bln_timer != RT_NULL);
+    rt_timer_start(olpc_data->bln_timer);
+
+    while (1)
+    {
+        ret = rt_event_recv(olpc_data->disp_event, EVENT_BLN_UPDATE | EVENT_BLN_EXIT,
+                            RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
+                            RT_WAITING_FOREVER, &event);
+        if (ret != RT_EOK)
+        {
+            /* Reserved... */
+        }
+
+        if (event & EVENT_BLN_UPDATE)
+        {
+            ret = olpc_bln_task_fun(olpc_data);
+            RT_ASSERT(ret == RT_EOK);
+        }
+
+        if (event & EVENT_BLN_EXIT)
+        {
+            break;
+        }
+    }
+
+    rt_timer_stop(olpc_data->bln_timer);
+    ret = rt_timer_delete(olpc_data->bln_timer);
+    RT_ASSERT(ret == RT_EOK);
+    olpc_data->bln_timer = RT_NULL;
+
+    rt_free_large((void *)olpc_data->blnfb);
+    olpc_data->blnfb = RT_NULL;
+
+    rt_event_send(olpc_data->disp_event, EVENT_BLN_EXIT_DONE);
+    rt_thread_delay(1);
+}
 #endif
 
 /*
  **************************************************************************************************
  *
- * clock home regions refresh
+ * clock regions refresh
  *
  **************************************************************************************************
  */
+
+extern image_info_t clock_bkg_info;
+extern image_info_t clock_sec_info;
+extern image_info_t clock_min_info;
+extern image_info_t clock_hour_info;
+#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332) || defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+extern image_info_t clock_centre_info;
+#endif
+
+/**
+ * Clock timer callback.
+ */
+static void olpc_clock_timeout(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    ++olpc_data->second;
+    if (olpc_data->second >= 60)
+    {
+        olpc_data->second = 0;
+        if (++olpc_data->minute == 60)
+        {
+            olpc_data->minute = 0;
+            if (++olpc_data->hour >= 24)
+            {
+                olpc_data->hour = 0;
+
+                if (++olpc_data->week == 7)
+                {
+                    olpc_data->week = 0;
+                }
+
+                if (++olpc_data->day > 31)
+                {
+                    olpc_data->day = 1;
+                    if (++olpc_data->month > 12)
+                    {
+                        olpc_data->month = 1;
+                    }
+                }
+                olpc_data->cmd |= UPDATE_MSG;
+            }
+        }
+
+        if ((olpc_data->minute % 3) == 0)
+        {
+            olpc_data->cmd |= MOVE_CLOCK | UPDATE_CLOCK;
+            olpc_data->cmd |= MOVE_MSG | UPDATE_MSG;
+        }
+    }
+
+    olpc_data->cmd |= UPDATE_CLOCK;
+    rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+}
 
 /**
  * Clock region move.
@@ -1617,6 +624,41 @@ static rt_err_t olpc_clock_clock_region_move(struct olpc_clock_data *olpc_data)
     return RT_EOK;
 }
 
+#if defined(OLPC_CLOCKBKG_USE_DTCM)
+/**
+ * Clock region refresh.
+ */
+static rt_err_t olpc_clock_clock_bkg_refresh(struct olpc_clock_data *olpc_data,
+        struct rt_display_config *wincfg)
+{
+    rt_err_t ret;
+    rt_device_t  device = olpc_data->disp->device;
+    struct rt_device_graphic_info info;
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
+
+    wincfg->winId  = CLOCKBKG_RGB565_WIN;
+    wincfg->format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+    wincfg->lut    = RT_NULL;
+    wincfg->lutsize = 0;
+    wincfg->fb    = olpc_data->bkgfb;
+    wincfg->w     = ((CLOCK_FB_W + 3) / 4) * 4;
+    wincfg->h     = CLOCK_FB_H;
+    wincfg->fblen = wincfg->w * wincfg->h * 2;
+    wincfg->x     = CLOCK_REGION_X + (CLOCK_REGION_W - CLOCK_FB_W) / 2 + olpc_data->clock_xoffset;
+    wincfg->y     = CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2 + olpc_data->clock_yoffset;
+    wincfg->y     = (wincfg->y / 2) * 2;
+
+    RT_ASSERT((wincfg->w % 4) == 0);
+    RT_ASSERT((wincfg->y % 2) == 0);
+    RT_ASSERT((wincfg->h % 2) == 0);
+    RT_ASSERT(wincfg->fblen <= olpc_data->bkgfblen);
+
+    return RT_EOK;
+}
+#endif
+
 /**
  * Clock region refresh.
  */
@@ -1633,9 +675,15 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
     RT_ASSERT(ret == RT_EOK);
 
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-    wincfg->winId = CLOCK_RGB565_WIN;
+    wincfg->winId  = CLOCK_RGB565_WIN;
+    wincfg->format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+    wincfg->lut    = RT_NULL;
+    wincfg->lutsize = 0;
 #else
-    wincfg->winId = CLOCK_RGB332_WIN;
+    wincfg->winId   = CLOCK_RGB332_WIN;
+    wincfg->format  = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    wincfg->lut     = bpp_lut;
+    wincfg->lutsize = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
 #endif
     wincfg->fb    = olpc_data->fb;
     wincfg->w     = ((CLOCK_FB_W + 3) / 4) * 4;
@@ -1656,20 +704,23 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
     RT_ASSERT((wincfg->h % 2) == 0);
     RT_ASSERT(wincfg->fblen <= olpc_data->fblen);
 
+    rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
+
+    xoffset = 0;
+    yoffset = 0;
+
     //draw background
-    {
-        xoffset = 0;
-        yoffset = 0;
-        img_info = &clock_bkg_info;
+    img_info = &clock_bkg_info;
+    RT_ASSERT(img_info->w <= wincfg->w);
+    RT_ASSERT(img_info->h <= wincfg->h);
 
-        rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
-        RT_ASSERT(img_info->w <= wincfg->w);
-        RT_ASSERT(img_info->h <= wincfg->h);
-
-        yoffset  += 0;
-        xoffset  += (CLOCK_FB_W - img_info->w) / 2;
-        rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
-    }
+    yoffset  += (CLOCK_FB_H - img_info->h) / 2;//0;
+    xoffset  += (CLOCK_FB_W - img_info->w) / 2;
+#ifdef OLPC_CLOCKBKG_USE_DTCM
+    wincfg->colorkey = COLOR_KEY_EN | 0;
+#else
+    rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
+#endif
 
     // draw hour,min,sec
     {
@@ -1771,6 +822,95 @@ static rt_err_t olpc_clock_clock_region_refresh(struct olpc_clock_data *olpc_dat
     return RT_EOK;
 }
 
+/*
+ **************************************************************************************************
+ *
+ * Msg functions
+ *
+ **************************************************************************************************
+ */
+
+extern image_info_t msg_font_0_info;
+extern image_info_t msg_font_1_info;
+extern image_info_t msg_font_2_info;
+extern image_info_t msg_font_percent_info;
+
+extern image_info_t msg_font_CHN_6_info;
+extern image_info_t msg_font_CHN_day_info;
+extern image_info_t msg_font_CHN_month_info;
+extern image_info_t msg_font_CN_week_info;
+
+extern image_info_t msg_bat5_info;
+extern image_info_t msg_mov3_info;
+
+extern image_info_t msg_music3_info;
+extern image_info_t msg_qq3_info;
+extern image_info_t msg_wb3_info;
+extern image_info_t msg_wx3_info;
+
+/* 0 ~ 9 */
+static const image_info_t *msg_font_num[10] =
+{
+    &msg_font_0_info,
+    &msg_font_1_info,
+    &msg_font_2_info,
+    &msg_font_0_info,
+    &msg_font_0_info,
+    &msg_font_0_info,
+    &msg_font_0_info,
+    &msg_font_0_info,
+    &msg_font_0_info,
+    &msg_font_0_info,
+};
+
+static const image_info_t *msg_week_num[7] =
+{
+    &msg_font_CHN_day_info,
+    &msg_font_CHN_day_info,
+    &msg_font_CHN_day_info,
+    &msg_font_CHN_day_info,
+    &msg_font_CHN_day_info,
+    &msg_font_CHN_day_info,
+    &msg_font_CHN_6_info,
+};
+
+static const image_info_t *msg_bat_num[5] =
+{
+    &msg_bat5_info,
+    &msg_bat5_info,
+    &msg_bat5_info,
+    &msg_bat5_info,
+    &msg_bat5_info,
+};
+
+static const image_info_t *msg_music_num[3] =
+{
+    &msg_music3_info,
+    &msg_music3_info,
+    &msg_music3_info,
+};
+
+static const image_info_t *msg_qq_num[3] =
+{
+    &msg_qq3_info,
+    &msg_qq3_info,
+    &msg_qq3_info,
+};
+
+static const image_info_t *msg_web_num[3] =
+{
+    &msg_wb3_info,
+    &msg_wb3_info,
+    &msg_wb3_info,
+};
+
+static const image_info_t *msg_wx_num[3] =
+{
+    &msg_wx3_info,
+    &msg_wx3_info,
+    &msg_wx3_info,
+};
+
 /**
  * Msg region move.
  */
@@ -1821,10 +961,17 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
     RT_ASSERT(ret == RT_EOK);
 
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-    wincfg->winId = CLOCK_RGB565_WIN;
+    wincfg->winId  = CLOCK_RGB565_WIN;
+    wincfg->format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+    wincfg->lut    = RT_NULL;
+    wincfg->lutsize = 0;
 #else
-    wincfg->winId = CLOCK_RGB332_WIN;
+    wincfg->winId   = CLOCK_RGB332_WIN;
+    wincfg->format  = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    wincfg->lut     = bpp_lut;
+    wincfg->lutsize = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
 #endif
+
     wincfg->fb    = olpc_data->fb;
     wincfg->w     = ((MSG_FB_W + 3) / 4) * 4;
     wincfg->h     = MSG_FB_H;
@@ -1857,14 +1004,14 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
     {
         /* month num */
         xoffset = xoffset_bak + 49;
-        img_info = msg_font_num[(olpc_data->month / 10) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->month / 10) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if ((olpc_data->month / 10) != 0)
         {
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
         }
         xoffset  = xoffset + img_info->w + 0;
-        img_info = msg_font_num[olpc_data->month % 10];
+        img_info = (image_info_t *)msg_font_num[olpc_data->month % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
@@ -1876,12 +1023,12 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
 
         /* day num */
         xoffset  = xoffset + img_info->w + 0;
-        img_info = msg_font_num[(olpc_data->day / 10) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->day / 10) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         xoffset  = xoffset + img_info->w + 0;
-        img_info = msg_font_num[olpc_data->day % 10];
+        img_info = (image_info_t *)msg_font_num[olpc_data->day % 10];
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* day */
@@ -1898,7 +1045,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
 
         /* week num */
         xoffset  = xoffset + img_info->w + 0;
-        img_info = msg_week_num[olpc_data->week % 7];
+        img_info = (image_info_t *)msg_week_num[olpc_data->week % 7];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
     }
@@ -1908,13 +1055,13 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
     {
         /* battary */
         xoffset = xoffset_bak + 48;
-        img_info = msg_bat_num[olpc_data->batval / 20];
+        img_info = (image_info_t *)msg_bat_num[olpc_data->batval / 20];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 8);
 
         /* battary num */
         xoffset += img_info->w + 0;
-        img_info = msg_font_num[(olpc_data->batval / 100) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->batval / 100) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if ((olpc_data->batval / 100) != 0)
         {
@@ -1922,7 +1069,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
         }
 
         xoffset += img_info->w + 0;
-        img_info = msg_font_num[(olpc_data->batval / 10) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->batval / 10) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if ((olpc_data->batval / 10) != 0)
         {
@@ -1930,7 +1077,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
         }
 
         xoffset += img_info->w + 0;
-        img_info = msg_font_num[olpc_data->batval % 10];
+        img_info = (image_info_t *) msg_font_num[olpc_data->batval % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
 
@@ -1948,7 +1095,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
         /* motion num */
         uint8_t flag = 0;
         xoffset += img_info->w + 0;
-        img_info = msg_font_num[(olpc_data->moval / 100000) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->moval / 100000) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if (((olpc_data->moval / 100000) % 10) != 0)
         {
@@ -1956,7 +1103,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
-        img_info = msg_font_num[(olpc_data->moval / 10000) % 10];
+        img_info = (image_info_t *) msg_font_num[(olpc_data->moval / 10000) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if (((olpc_data->moval / 10000) != 0) || (flag == 1))
         {
@@ -1964,7 +1111,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
-        img_info = msg_font_num[(olpc_data->moval / 1000) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->moval / 1000) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if (((olpc_data->moval / 1000) != 0) || (flag == 1))
         {
@@ -1972,7 +1119,7 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
-        img_info = msg_font_num[(olpc_data->moval / 100) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->moval / 100) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if (((olpc_data->moval / 100) != 0) || (flag == 1))
         {
@@ -1980,14 +1127,14 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
-        img_info = msg_font_num[(olpc_data->moval / 10) % 10];
+        img_info = (image_info_t *)msg_font_num[(olpc_data->moval / 10) % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         if (((olpc_data->moval / 10) != 0) || (flag == 1))
         {
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
             xoffset += img_info->w + 0;
         }
-        img_info = msg_font_num[olpc_data->moval % 10];
+        img_info = (image_info_t *)msg_font_num[olpc_data->moval % 10];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset + 3);
     }
@@ -1997,31 +1144,64 @@ static rt_err_t olpc_clock_msg_region_refresh(struct olpc_clock_data *olpc_data,
     {
         /* music */
         xoffset = xoffset_bak + 106;
-        img_info = msg_music_num[olpc_data->musicval];
+        img_info = (image_info_t *)msg_music_num[olpc_data->musicval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* qq */
         xoffset += img_info->w + 20;
-        img_info = msg_qq_num[olpc_data->qqval];
+        img_info = (image_info_t *)msg_qq_num[olpc_data->qqval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* web */
         xoffset += img_info->w + 20;
-        img_info = msg_web_num[olpc_data->webval];
+        img_info = (image_info_t *)msg_web_num[olpc_data->webval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
 
         /* wx */
         xoffset += img_info->w + 20;
-        img_info = msg_wx_num[olpc_data->wexval];
+        img_info = (image_info_t *)msg_wx_num[olpc_data->wexval];
         RT_ASSERT((yoffset + img_info->h) <= MSG_FB_H);
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset, yoffset);
     }
 
     return RT_EOK;
 }
+
+/*
+ **************************************************************************************************
+ *
+ * Home functions
+ *
+ **************************************************************************************************
+ */
+
+extern image_info_t home_backgroung_info;
+extern image_info_t home_arrow1_info;
+extern image_info_t home_lock1_info;
+extern image_info_t home_unlock1_info;
+extern image_info_t home_light1_info;
+extern image_info_t home_cam1_info;
+extern image_info_t home_srlock1_info;
+extern image_info_t home_clock1_info;
+extern image_info_t home_ebook1_info;
+extern image_info_t home_game1_info;
+extern image_info_t home_calc1_info;
+
+static const image_info_t *home_item[8 + 1] =
+{
+    &home_unlock1_info,
+    &home_light1_info,
+    &home_cam1_info,
+    &home_srlock1_info,
+    &home_clock1_info,
+    &home_ebook1_info,
+    &home_game1_info,
+    &home_calc1_info,
+    RT_NULL,
+};
 
 /**
  * home region refresh.
@@ -2038,7 +1218,10 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
     ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
     RT_ASSERT(ret == RT_EOK);
 
-    wincfg->winId = CLOCK_GRAY1_WIN;
+    wincfg->winId  = CLOCK_GRAY1_WIN;
+    wincfg->format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    wincfg->lut    = bpp1_lut;
+    wincfg->lutsize = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
     wincfg->fb    = olpc_data->fb;
     wincfg->w     = ((HOME_FB_W + 31) / 32) * 32;
     wincfg->h     = HOME_FB_H;
@@ -2077,7 +1260,7 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
         rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
 
         /* home ebook */
-        img_info = home_item[olpc_data->home_id];
+        img_info = (image_info_t *)home_item[olpc_data->home_id];
         if (img_info != NULL)
         {
             rt_display_img_fill(img_info, wincfg->fb, wincfg->w, xoffset + img_info->x, yoffset + img_info->y);
@@ -2085,6 +1268,118 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
     }
 
     return RT_EOK;
+}
+
+#if defined(RT_USING_TOUCH)
+/**
+ * home item touch.
+ */
+static rt_err_t olpc_clock_home_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
+{
+    rt_err_t ret = RT_ERROR;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    switch (event)
+    {
+    case TOUCH_EVENT_SHORT_DOWN:
+        olpc_data->home_id = touch_id;
+        olpc_data->cmd |= UPDATE_HOME;
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+        ret = RT_EOK;
+        break;
+
+    case TOUCH_EVENT_UP:
+        olpc_data->home_id = touch_id;
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_EXIT);
+        ret = RT_EOK;
+        break;
+
+    default:
+        break;
+    }
+
+    return ret;
+}
+
+static rt_err_t olpc_clock_home_touch_register(void *parameter)
+{
+    rt_int16_t   i, x, y;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* home button key register */
+    {
+        x  = HOME_REGION_X + (HOME_REGION_W - HOME_FB_W) / 2;
+        y  = HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2;
+        for (i = 0; i < 8; i++)
+        {
+            image_info_t *img_info = (image_info_t *)home_item[i];
+            register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_clock_home_touch_callback, (void *)olpc_data, i);
+            update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
+        }
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_clock_home_touch_unregister(void *parameter)
+{
+    rt_int16_t   i;
+
+    /* home button key register */
+    {
+        for (i = 0; i < 8; i++)
+        {
+            image_info_t *img_info = (image_info_t *)home_item[i];
+            unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+        }
+    }
+
+    return RT_EOK;
+}
+#endif
+
+/*
+ **************************************************************************************************
+ *
+ * Fingerprint functions
+ *
+ **************************************************************************************************
+ */
+
+extern image_info_t fingerprint0_info;
+extern image_info_t fingerprint1_info;
+extern image_info_t fingerprint2_info;
+extern image_info_t fingerprint3_info;
+
+static const image_info_t *fingerprint_item[7] =
+{
+    &fingerprint3_info,
+    &fingerprint2_info,
+    &fingerprint1_info,
+    &fingerprint0_info,
+    &fingerprint1_info,
+    &fingerprint2_info,
+    &fingerprint3_info
+};
+
+/**
+ * Fingerprint refresh timer callback.
+ */
+static void olpc_fp_timeout(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    olpc_data->fp_id++;
+    olpc_data->cmd |= UPDATE_FINGERP;
+    rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+
+    if (olpc_data->fp_id >= 6)
+    {
+        rt_timer_stop(olpc_data->fp_timer);
+    }
 }
 
 /**
@@ -2103,9 +1398,15 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     RT_ASSERT(ret == RT_EOK);
 
 #if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
-    wincfg->winId = CLOCK_RGB565_WIN;
+    wincfg->winId  = CLOCK_RGB565_WIN;
+    wincfg->format = RTGRAPHIC_PIXEL_FORMAT_RGB565;
+    wincfg->lut    = RT_NULL;
+    wincfg->lutsize = 0;
 #else
-    wincfg->winId = CLOCK_RGB332_WIN;
+    wincfg->winId   = CLOCK_RGB332_WIN;
+    wincfg->format  = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    wincfg->lut     = bpp_lut;
+    wincfg->lutsize = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
 #endif
     wincfg->fb    = olpc_data->fb;
     wincfg->w     = ((FP_FB_W + 3) / 4) * 4;
@@ -2132,7 +1433,7 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     if (olpc_data->screen_sta == SCREEN_HOME)
     {
         // draw fingerprint img
-        img_info = fingerprint_item[olpc_data->fp_id];
+        img_info = (image_info_t *)fingerprint_item[olpc_data->fp_id];
         RT_ASSERT(img_info->w <= wincfg->w);
         RT_ASSERT(img_info->h <= wincfg->h);
 
@@ -2144,6 +1445,74 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     return RT_EOK;
 }
 
+#if defined(RT_USING_TOUCH)
+/**
+ * fingerprint touch.
+ */
+static rt_err_t olpc_clock_fingerprint_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
+{
+    rt_err_t ret = RT_ERROR;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    switch (event)
+    {
+    case TOUCH_EVENT_SHORT_DOWN:
+        olpc_data->fp_id  = 0;
+        olpc_data->cmd |= UPDATE_FINGERP;
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+
+        rt_timer_start(olpc_data->fp_timer);
+        ret = RT_EOK;
+        break;
+
+    default:
+        break;
+    }
+
+    return ret;
+}
+
+static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter)
+{
+    rt_int16_t   x, y;
+    image_info_t *img_info;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* fingerprint button key register */
+    {
+        img_info = &fingerprint0_info;
+        x  = FP_REGION_X + (FP_REGION_W - FP_FB_W) / 2 + (FP_FB_W - img_info->w) / 2;
+        y  = FP_REGION_Y + (FP_REGION_H - FP_FB_H) / 2;
+        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_clock_fingerprint_touch_callback, (void *)olpc_data, 0);
+        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = &fingerprint0_info;
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
+}
+#endif
+
+/*
+ **************************************************************************************************
+ *
+ * LockBar functions
+ *
+ **************************************************************************************************
+ */
+
+extern image_info_t lock_bar_info;
+extern image_info_t lock_block_info;
 
 /**
  * lock region refresh.
@@ -2162,6 +1531,9 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
     RT_ASSERT(ret == RT_EOK);
 
     wincfg->winId = CLOCK_GRAY1_WIN;
+    wincfg->format = RTGRAPHIC_PIXEL_FORMAT_GRAY1;
+    wincfg->lut  = bpp1_lut;
+    wincfg->lutsize = sizeof(bpp1_lut) / sizeof(bpp1_lut[0]);
     wincfg->fb    = olpc_data->fb;
     wincfg->w     = ((LOCK_FB_W + 31) / 32) * 32;
     wincfg->h     = LOCK_FB_H;
@@ -2222,459 +1594,14 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
             olpc_data->fp_id    = 0;
             olpc_data->screen_sta = SCREEN_HOME;
             olpc_data->cmd = UPDATE_HOME | UPDATE_FINGERP;
-            rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+            rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
         }
     }
 
     return RT_EOK;
 }
 
-/**
- * Display clock demo task function.
- */
-static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
-{
-    rt_err_t ret;
-    struct rt_display_config  wincfg, wincfg1;
-    struct rt_display_config *winhead;
-
-    //rt_tick_t ticks = rt_tick_get();
-
-    rt_uint32_t updatecmd = olpc_data->cmd;
-    olpc_data->cmd = 0;
-    do
-    {
-        winhead = RT_NULL;
-        rt_memset(&wincfg, 0, sizeof(struct rt_display_config));
-        rt_memset(&wincfg1, 0, sizeof(struct rt_display_config));
-
-        if ((updatecmd & MOVE_CLOCK) == MOVE_CLOCK)
-        {
-            updatecmd &= ~MOVE_CLOCK;
-
-            olpc_clock_clock_region_move(olpc_data);
-        }
-
-        if ((updatecmd & MOVE_MSG) == MOVE_MSG)
-        {
-            updatecmd &= ~MOVE_MSG;
-
-            olpc_clock_msg_region_move(olpc_data);
-        }
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-        if ((updatecmd & MOVE_LAMP) == MOVE_LAMP)
-        {
-            updatecmd &= ~MOVE_LAMP;
-
-            olpc_lamp_move(olpc_data);
-            olpc_lamplist_create(olpc_data);
-
-            updatecmd |= UPDATE_LAMP;
-        }
-#endif
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-        // draw lamp
-        if ((updatecmd & UPDATE_LAMP) == UPDATE_LAMP)
-        {
-            struct olpc_lamp_disp_t *lamplist;
-            lamplist = (struct olpc_lamp_disp_t *)rt_slist_first(&glamplist);
-            ret = olpc_clock_lamp_refresh(olpc_data, &wincfg1, lamplist);
-            RT_ASSERT(ret == RT_EOK);
-
-            if (lamplist->region == REGION_ID_CLOCK)
-            {
-                updatecmd &= ~UPDATE_CLOCK;
-                ret = olpc_clock_clock_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-            }
-            else if (lamplist->region == REGION_ID_MSG)
-            {
-                updatecmd &= ~UPDATE_MSG;
-                ret = olpc_clock_msg_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-            }
-            else if (lamplist->region == REGION_ID_HOME)
-            {
-                updatecmd &= ~UPDATE_HOME;
-                ret = olpc_clock_home_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-            }
-            else if (lamplist->region == REGION_ID_FP)
-            {
-                updatecmd &= ~UPDATE_FINGERP;
-                ret = olpc_clock_fingerprint_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-            }
-            else if (lamplist->region == REGION_ID_LOCK)
-            {
-                updatecmd &= ~UPDATE_LOCK;
-                ret = olpc_clock_lock_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-            }
-
-            rt_slist_remove(&glamplist, (rt_slist_t *)lamplist);
-            rt_free(lamplist);
-
-            if (rt_slist_isempty(&glamplist))
-            {
-                updatecmd &= ~UPDATE_LAMP;
-            }
-        }
-        else
-#endif
-        {
-            if ((updatecmd & UPDATE_CLOCK) == UPDATE_CLOCK)
-            {
-                updatecmd &= ~UPDATE_CLOCK;
-
-                ret = olpc_clock_clock_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-                struct olpc_lamp_disp_t displamp;
-                ret = olpc_lamp_region_overlay_check(olpc_data, &displamp, REGION_ID_CLOCK);
-                if (ret == RT_EOK)
-                {
-                    ret = olpc_clock_lamp_refresh(olpc_data, &wincfg1, &displamp);
-                    RT_ASSERT(ret == RT_EOK);
-                }
-#endif
-            }
-            else if ((updatecmd & UPDATE_MSG) == UPDATE_MSG)
-            {
-                updatecmd &= ~UPDATE_MSG;
-
-                ret = olpc_clock_msg_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-                struct olpc_lamp_disp_t displamp;
-                ret = olpc_lamp_region_overlay_check(olpc_data, &displamp, REGION_ID_MSG);
-                if (ret == RT_EOK)
-                {
-                    ret = olpc_clock_lamp_refresh(olpc_data, &wincfg1, &displamp);
-                    RT_ASSERT(ret == RT_EOK);
-                }
-#endif
-            }
-            else if ((updatecmd & UPDATE_HOME) == UPDATE_HOME)
-            {
-                updatecmd &= ~UPDATE_HOME;
-
-                ret = olpc_clock_home_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-                struct olpc_lamp_disp_t displamp;
-                ret = olpc_lamp_region_overlay_check(olpc_data, &displamp, REGION_ID_HOME);
-                if (ret == RT_EOK)
-                {
-                    ret = olpc_clock_lamp_refresh(olpc_data, &wincfg1, &displamp);
-                    RT_ASSERT(ret == RT_EOK);
-                }
-#endif
-            }
-            else if ((updatecmd & UPDATE_FINGERP) == UPDATE_FINGERP)
-            {
-                updatecmd &= ~UPDATE_FINGERP;
-
-                ret = olpc_clock_fingerprint_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-                struct olpc_lamp_disp_t displamp;
-                ret = olpc_lamp_region_overlay_check(olpc_data, &displamp, REGION_ID_FP);
-                if (ret == RT_EOK)
-                {
-                    ret = olpc_clock_lamp_refresh(olpc_data, &wincfg1, &displamp);
-                    RT_ASSERT(ret == RT_EOK);
-                }
-#endif
-            }
-            else if ((updatecmd & UPDATE_LOCK) == UPDATE_LOCK)
-            {
-                updatecmd &= ~UPDATE_LOCK;
-
-                ret = olpc_clock_lock_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-
-#if defined(OLPC_APP_CLOCK_LOOP_LAMP)
-                struct olpc_lamp_disp_t displamp;
-                ret = olpc_lamp_region_overlay_check(olpc_data, &displamp, REGION_ID_LOCK);
-                if (ret == RT_EOK)
-                {
-                    ret = olpc_clock_lamp_refresh(olpc_data, &wincfg1, &displamp);
-                    RT_ASSERT(ret == RT_EOK);
-                }
-#endif
-            }
-#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
-            else if ((updatecmd & UPDATE_BLN) == UPDATE_BLN)
-            {
-                updatecmd &= ~UPDATE_BLN;
-
-                ret = olpc_clock_bln_region_refresh(olpc_data, &wincfg);
-                RT_ASSERT(ret == RT_EOK);
-            }
-#endif
-        }
-
-        //refresh screen
-        if (wincfg.fb != 0)
-        {
-            //rt_kprintf("wincfg0\n");
-            rt_display_win_layers_list(&winhead, &wincfg);
-        }
-        if (wincfg1.fb != 0)
-        {
-            //rt_kprintf("wincfg1\n");
-            rt_display_win_layers_list(&winhead, &wincfg1);
-        }
-        if (winhead != RT_NULL)
-        {
-            ret = rt_display_win_layers_set(winhead);
-            RT_ASSERT(ret == RT_EOK);
-        }
-    }
-    while (updatecmd != 0);
-
-    //rt_kprintf("clock ticks = %d\n", rt_tick_get() - ticks);
-
-    return RT_EOK;
-}
-
-/*
- **************************************************************************************************
- *
- * olpc clock touch functions
- *
- **************************************************************************************************
- */
 #if defined(RT_USING_TOUCH)
-/**
- * screen touch.
- */
-static rt_err_t olpc_clock_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
-{
-    rt_err_t ret = RT_ERROR;
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    switch (event)
-    {
-    case TOUCH_EVENT_SHORT_DOWN:
-        if (olpc_data->screen_sta == SCREEN_OFF)
-        {
-            olpc_data->screen_sta = SCREEN_LOCK;
-
-            olpc_clock_lock_touch_register(parameter);
-
-            image_info_t *img = &lock_block_info;
-            olpc_data->lock_px = img->x_scr;
-            olpc_data->lock_py = img->y_scr;
-            olpc_data->cmd |= UPDATE_LOCK;
-            rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-
-            ret = RT_EOK;
-        }
-        break;
-
-    default:
-        break;
-    }
-
-    rt_timer_start(olpc_data->src_timer);   // start & restart timer
-
-    return ret;
-}
-
-static rt_err_t olpc_clock_screen_touch_register(void *parameter)
-{
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-    struct rt_device_graphic_info info;
-
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    /* screen on button key register */
-    {
-        screen_item.w = WIN_LAYERS_W;
-        screen_item.h = WIN_LAYERS_H;
-        register_touch_item((struct olpc_touch_item *)(&screen_item.touch_item), (void *)olpc_clock_screen_touch_callback, (void *)olpc_data, 0);
-        update_item_coord((struct olpc_touch_item *)(&screen_item.touch_item), 0, 0, 0, 0);
-    }
-
-    return RT_EOK;
-}
-
-static rt_err_t olpc_clock_screen_touch_unregister(void *parameter)
-{
-    image_info_t *img_info = &screen_item;
-
-    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
-
-    return RT_EOK;
-}
-
-/**
- * home item touch.
- */
-static rt_err_t olpc_clock_home_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
-{
-    rt_err_t ret = RT_ERROR;
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    switch (event)
-    {
-    case TOUCH_EVENT_SHORT_DOWN:
-        olpc_data->home_id = touch_id;
-        olpc_data->cmd |= UPDATE_HOME;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-        rt_thread_delay(10);
-        if (olpc_data->home_id == 1)
-        {
-#if defined(OLPC_APP_BLN_ENABLE)
-            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //xscreen
-#endif
-        }
-        else if (olpc_data->home_id == 2)
-        {
-#if defined(OLPC_APP_XSCREEN_ENABLE)
-            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //xscreen
-#endif
-        }
-        else if (olpc_data->home_id == 3)
-        {
-#if defined(OLPC_APP_NOTE_ENABLE)
-            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //note
-#endif
-        }
-        else if (olpc_data->home_id == 4)
-        {
-#if defined(OLPC_APP_SNAKE_ENABLE)
-            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //snake
-#endif
-        }
-        else if (olpc_data->home_id == 5)
-        {
-#if defined(OLPC_APP_EBOOK_ENABLE)
-            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //ebook
-#endif
-        }
-        else if (olpc_data->home_id == 6)
-        {
-#if defined(OLPC_APP_BLOCK_ENABLE)
-            rt_event_send(olpc_data->disp_event, EVENT_EXIT_CLOCK); //block
-#endif
-        }
-
-        ret = RT_EOK;
-        break;
-
-    default:
-        break;
-    }
-
-    return ret;
-}
-
-static rt_err_t olpc_clock_home_touch_register(void *parameter)
-{
-    rt_int16_t   i, x, y;
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-    struct rt_device_graphic_info info;
-
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    /* home button key register */
-    {
-        x  = HOME_REGION_X + (HOME_REGION_W - HOME_FB_W) / 2;
-        y  = HOME_REGION_Y + (HOME_REGION_H - HOME_FB_H) / 2;
-        for (i = 0; i < 8; i++)
-        {
-            image_info_t *img_info = home_item[i];
-            register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_clock_home_touch_callback, (void *)olpc_data, i);
-            update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, home_item[i]->x, home_item[i]->y);
-        }
-    }
-
-    return RT_EOK;
-}
-
-static rt_err_t olpc_clock_home_touch_unregister(void *parameter)
-{
-    rt_int16_t   i;
-
-    /* home button key register */
-    {
-        for (i = 0; i < 8; i++)
-        {
-            image_info_t *img_info = home_item[i];
-            unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
-        }
-    }
-
-    return RT_EOK;
-}
-
-/**
- * fingerprint touch.
- */
-static rt_err_t olpc_clock_fingerprint_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
-{
-    rt_err_t ret = RT_ERROR;
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-
-    switch (event)
-    {
-    case TOUCH_EVENT_SHORT_DOWN:
-        olpc_data->fp_id  = 0;
-        olpc_data->cmd |= UPDATE_FINGERP;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
-        rt_timer_start(olpc_data->fp_timer);
-        ret = RT_EOK;
-        break;
-
-    default:
-        break;
-    }
-
-    return ret;
-}
-
-static rt_err_t olpc_clock_fingerprint_touch_register(void *parameter)
-{
-    rt_int16_t   x, y;
-    image_info_t *img_info;
-    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
-    struct rt_device_graphic_info info;
-
-    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
-
-    /* fingerprint button key register */
-    {
-        img_info = &fingerprint0_info;
-        x  = FP_REGION_X + (FP_REGION_W - FP_FB_W) / 2 + (FP_FB_W - img_info->w) / 2;
-        y  = FP_REGION_Y + (FP_REGION_H - FP_FB_H) / 2;
-        register_touch_item((struct olpc_touch_item *)(&img_info->touch_item), (void *)olpc_clock_fingerprint_touch_callback, (void *)olpc_data, 0);
-        update_item_coord((struct olpc_touch_item *)(&img_info->touch_item), x, y, img_info->x, img_info->y);
-    }
-
-    return RT_EOK;
-}
-
-static rt_err_t olpc_clock_fingerprint_touch_unregister(void *parameter)
-{
-    image_info_t *img_info = &fingerprint0_info;
-
-    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
-
-    return RT_EOK;
-}
-
 /**
  * lock touch.
  */
@@ -2707,7 +1634,7 @@ static rt_err_t olpc_clock_lock_touch_callback(rt_int32_t touch_id, enum olpc_to
         }
 
         olpc_data->cmd |= UPDATE_LOCK;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
         ret = RT_EOK;
         break;
 
@@ -2719,7 +1646,7 @@ static rt_err_t olpc_clock_lock_touch_callback(rt_int32_t touch_id, enum olpc_to
         olpc_data->lock_py = img->y_scr;
 
         olpc_data->cmd |= UPDATE_LOCK;
-        rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
     }
     break;
     default:
@@ -2764,10 +1691,444 @@ static rt_err_t olpc_clock_lock_touch_unregister(void *parameter)
 /*
  **************************************************************************************************
  *
+ * olpc clock thread task funs
+ *
+ **************************************************************************************************
+ */
+#if defined(RT_USING_TOUCH)
+/**
+ * screen touch.
+ */
+static image_info_t screen_item;
+static rt_err_t olpc_clock_screen_touch_callback(rt_int32_t touch_id, enum olpc_touch_event event, struct point_info *point, void *parameter)
+{
+    rt_err_t ret = RT_ERROR;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    switch (event)
+    {
+    case TOUCH_EVENT_SHORT_DOWN:
+        if (olpc_data->screen_sta == SCREEN_OFF)
+        {
+            olpc_data->screen_sta = SCREEN_LOCK;
+
+            olpc_clock_lock_touch_register(parameter);
+
+            image_info_t *img = &lock_block_info;
+            olpc_data->lock_px = img->x_scr;
+            olpc_data->lock_py = img->y_scr;
+            olpc_data->cmd |= UPDATE_LOCK;
+            rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+
+
+            ret = RT_EOK;
+        }
+        break;
+
+    default:
+        break;
+    }
+
+    rt_timer_start(olpc_data->src_timer);   // start & restart timer
+
+    return ret;
+}
+
+static rt_err_t olpc_clock_screen_touch_register(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+    struct rt_device_graphic_info info;
+
+    rt_memcpy(&info, &olpc_data->disp->info, sizeof(struct rt_device_graphic_info));
+
+    /* screen on button key register */
+    {
+        screen_item.w = WIN_LAYERS_W;
+        screen_item.h = WIN_LAYERS_H;
+        register_touch_item((struct olpc_touch_item *)(&screen_item.touch_item), (void *)olpc_clock_screen_touch_callback, (void *)olpc_data, 0);
+        update_item_coord((struct olpc_touch_item *)(&screen_item.touch_item), 0, 0, 0, 0);
+    }
+
+    return RT_EOK;
+}
+
+static rt_err_t olpc_clock_screen_touch_unregister(void *parameter)
+{
+    image_info_t *img_info = &screen_item;
+
+    unregister_touch_item((struct olpc_touch_item *)(&img_info->touch_item));
+
+    return RT_EOK;
+}
+
+#endif
+
+/**
+ * Screen timeout timer callback.
+ */
+static void olpc_screen_timeout(void *parameter)
+{
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    if (olpc_data->screen_sta == SCREEN_HOME)
+    {
+#if defined(RT_USING_TOUCH)
+        olpc_clock_home_touch_unregister(olpc_data);
+        olpc_clock_fingerprint_touch_unregister(olpc_data);
+#endif
+        olpc_data->screen_sta = SCREEN_OFF;
+        olpc_data->cmd |= UPDATE_HOME | UPDATE_FINGERP;
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+    }
+    else if (olpc_data->screen_sta == SCREEN_LOCK)
+    {
+#if defined(RT_USING_TOUCH)
+        olpc_clock_lock_touch_unregister(olpc_data);
+#endif
+        olpc_data->screen_sta = SCREEN_OFF;
+        olpc_data->cmd |= UPDATE_LOCK;
+        rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
+    }
+
+    olpc_data->screen_sta = SCREEN_OFF;
+}
+
+/**
+ * Display clock demo init.
+ */
+static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
+{
+    rt_err_t    ret;
+    rt_device_t device = olpc_data->disp->device;
+    struct rt_device_graphic_info info;
+
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
+
+    olpc_data->hour = 3;
+    olpc_data->minute = 30;
+    olpc_data->second = 0;
+    olpc_data->ticks = 0;
+    olpc_data->day = 2;
+    olpc_data->month = 12;
+    olpc_data->week = 6;
+
+    olpc_data->batval = 21;
+    olpc_data->moval = 100121;
+    olpc_data->musicval = 2;
+    olpc_data->qqval = 2;
+    olpc_data->webval = 2;
+    olpc_data->wexval = 2;
+
+    olpc_data->clock_xoffset = 0;
+    olpc_data->clock_yoffset = 0;
+    olpc_data->clock_xdir = -1;
+    olpc_data->clock_ydir = -1;
+    olpc_data->clock_ylast = CLOCK_REGION_Y + (CLOCK_REGION_H - CLOCK_FB_H) / 2;
+
+    olpc_data->msg_xoffset = 0;
+    olpc_data->msg_yoffset = 0;
+    olpc_data->msg_xdir = 1;
+    olpc_data->msg_ydir = 1;
+    olpc_data->msg_ylast = MSG_REGION_Y + (MSG_REGION_H - MSG_FB_H) / 2;
+
+    olpc_data->home_id = 0;
+    olpc_data->fp_id = 0;
+    olpc_data->screen_sta = SCREEN_OFF;
+
+    olpc_data->cmd = UPDATE_CLOCK | UPDATE_MSG;
+
+#if defined(OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565)
+    olpc_data->fblen = CLOCK_FB_W * CLOCK_FB_H * 2;
+#else
+    olpc_data->fblen = CLOCK_FB_W * CLOCK_FB_H;
+#endif
+    olpc_data->fb    = (rt_uint8_t *)rt_malloc_large(olpc_data->fblen);
+    RT_ASSERT(olpc_data->fb != RT_NULL);
+
+#if defined(OLPC_CLOCKBKG_USE_DTCM)
+    image_info_t *img_info = &clock_bkg_info;
+    rt_uint16_t xVir    = ((CLOCK_FB_W + 3) / 4) * 4;
+    rt_uint16_t yoffset = (CLOCK_FB_H - img_info->h) / 2;//0;
+    rt_uint16_t xoffset = (CLOCK_FB_W - img_info->w) / 2;
+
+    olpc_data->bkgfblen = CLOCK_FB_W * CLOCK_FB_H * 2;
+    olpc_data->bkgfb    = (rt_uint8_t *)rt_malloc_dtcm(olpc_data->bkgfblen);
+    RT_ASSERT(olpc_data->bkgfb != RT_NULL);
+    rt_memset(olpc_data->bkgfb, 0, olpc_data->bkgfblen);
+    rt_display_img_fill(img_info, olpc_data->bkgfb, xVir, xoffset, yoffset);
+#endif
+
+    // create sreen touch timer
+    olpc_data->src_timer = rt_timer_create("srctimer",
+                                           olpc_screen_timeout,
+                                           (void *)olpc_data,
+                                           SCREEN_HOLD_TIME,
+                                           RT_TIMER_FLAG_ONE_SHOT);
+    RT_ASSERT(olpc_data->src_timer != RT_NULL);
+
+    // create fp touch timer
+    olpc_data->fp_timer = rt_timer_create("fptimer",
+                                          olpc_fp_timeout,
+                                          (void *)olpc_data,
+                                          FP_LOOP_TIME,
+                                          RT_TIMER_FLAG_PERIODIC);
+    RT_ASSERT(olpc_data->fp_timer != RT_NULL);
+
+    // create clock timer
+    olpc_data->clock_timer = rt_timer_create("clocktimer",
+                             olpc_clock_timeout,
+                             (void *)olpc_data,
+                             CLOCK_UPDATE_TIME,
+                             RT_TIMER_FLAG_PERIODIC);
+    RT_ASSERT(olpc_data->clock_timer != RT_NULL);
+    rt_timer_start(olpc_data->clock_timer);
+
+#if defined(RT_USING_TOUCH)
+    olpc_clock_screen_touch_register(olpc_data);
+#endif
+
+    return RT_EOK;
+}
+
+/**
+ * Display clock demo deinit.
+ */
+static void olpc_clock_deinit(struct olpc_clock_data *olpc_data)
+{
+    rt_err_t ret;
+
+#if defined(RT_USING_TOUCH)
+    olpc_clock_screen_touch_unregister(olpc_data);
+    olpc_touch_list_clear();
+#endif
+    rt_timer_stop(olpc_data->fp_timer);
+    ret = rt_timer_delete(olpc_data->fp_timer);
+    RT_ASSERT(ret == RT_EOK);
+    olpc_data->fp_timer = RT_NULL;
+
+    rt_timer_stop(olpc_data->src_timer);
+    ret = rt_timer_delete(olpc_data->src_timer);
+    RT_ASSERT(ret == RT_EOK);
+    olpc_data->src_timer = RT_NULL;
+
+    ret = rt_timer_stop(olpc_data->clock_timer);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_timer_delete(olpc_data->clock_timer);
+    RT_ASSERT(ret == RT_EOK);
+    olpc_data->clock_timer = RT_NULL;
+
+#if defined(OLPC_CLOCKBKG_USE_DTCM)
+    rt_free_dtcm((void *)olpc_data->bkgfb);
+    olpc_data->bkgfb = RT_NULL;
+#endif
+    rt_free_large((void *)olpc_data->fb);
+    olpc_data->fb = RT_NULL;
+}
+
+static rt_err_t olpc_clock_disp_finish(void)
+{
+    rt_err_t ret;
+
+    ret = rt_event_send(g_olpc_data->disp_event, EVENT_CLOCK_DISP);
+
+    return ret;
+}
+
+static rt_err_t olpc_clock_disp_wait(void)
+{
+    rt_err_t ret;
+    uint32_t event;
+
+    ret = rt_event_recv(g_olpc_data->disp_event, EVENT_CLOCK_DISP,
+                        RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
+                        RT_WAITING_FOREVER, &event);
+    RT_ASSERT(ret == RT_EOK);
+
+    return RT_EOK;
+}
+
+/**
+ * Display clock demo task function.
+ */
+static rt_err_t olpc_clock_task_fun(struct olpc_clock_data *olpc_data)
+{
+    rt_err_t    ret;
+    rt_uint32_t updatecmd;
+    struct rt_display_mq_t disp_mq;
+
+    updatecmd = olpc_data->cmd;
+    olpc_data->cmd = 0;
+
+    //rt_tick_t ticks = rt_tick_get();
+    do
+    {
+        rt_memset(&disp_mq, 0, sizeof(struct rt_display_mq_t));
+        disp_mq.win[0].zpos = WIN_TOP_LAYER;
+        disp_mq.win[1].zpos = WIN_BOTTOM_LAYER;
+
+        // clock & msg move process
+        {
+            if ((updatecmd & MOVE_CLOCK) == MOVE_CLOCK)
+            {
+                updatecmd &= ~MOVE_CLOCK;
+
+                olpc_clock_clock_region_move(olpc_data);
+            }
+
+            if ((updatecmd & MOVE_MSG) == MOVE_MSG)
+            {
+                updatecmd &= ~MOVE_MSG;
+
+                olpc_clock_msg_region_move(olpc_data);
+            }
+        }
+
+        // display process
+        {
+            if ((updatecmd & UPDATE_CLOCK) == UPDATE_CLOCK)
+            {
+                updatecmd &= ~UPDATE_CLOCK;
+#if defined(OLPC_CLOCKBKG_USE_DTCM)
+                ret = olpc_clock_clock_bkg_refresh(olpc_data, &disp_mq.win[1]);
+                RT_ASSERT(ret == RT_EOK);
+                disp_mq.cfgsta |= (0x01 << 1);
+#endif
+                ret = olpc_clock_clock_region_refresh(olpc_data, &disp_mq.win[0]);
+                RT_ASSERT(ret == RT_EOK);
+                disp_mq.cfgsta |= (0x01 << 0);
+            }
+            else if ((updatecmd & UPDATE_MSG) == UPDATE_MSG)
+            {
+                updatecmd &= ~UPDATE_MSG;
+
+                ret = olpc_clock_msg_region_refresh(olpc_data, &disp_mq.win[0]);
+                RT_ASSERT(ret == RT_EOK);
+                disp_mq.cfgsta |= (0x01 << 0);
+            }
+            else if ((updatecmd & UPDATE_HOME) == UPDATE_HOME)
+            {
+                updatecmd &= ~UPDATE_HOME;
+
+                ret = olpc_clock_home_region_refresh(olpc_data, &disp_mq.win[0]);
+                RT_ASSERT(ret == RT_EOK);
+                disp_mq.cfgsta |= (0x01 << 0);
+            }
+            else if ((updatecmd & UPDATE_FINGERP) == UPDATE_FINGERP)
+            {
+                updatecmd &= ~UPDATE_FINGERP;
+
+                ret = olpc_clock_fingerprint_region_refresh(olpc_data, &disp_mq.win[0]);
+                RT_ASSERT(ret == RT_EOK);
+                disp_mq.cfgsta |= (0x01 << 0);
+            }
+            else if ((updatecmd & UPDATE_LOCK) == UPDATE_LOCK)
+            {
+                updatecmd &= ~UPDATE_LOCK;
+
+                ret = olpc_clock_lock_region_refresh(olpc_data, &disp_mq.win[0]);
+                RT_ASSERT(ret == RT_EOK);
+                disp_mq.cfgsta |= (0x01 << 0);
+            }
+
+            if (disp_mq.cfgsta)
+            {
+                disp_mq.disp_finish = olpc_clock_disp_finish;
+                ret = rt_mq_send(olpc_data->disp->disp_mq, &disp_mq, sizeof(struct rt_display_mq_t));
+                RT_ASSERT(ret == RT_EOK);
+                olpc_clock_disp_wait();
+            }
+        }
+    }
+    while (updatecmd != 0);
+
+    //rt_kprintf("clock ticks = %d\n", rt_tick_get() - ticks);
+
+    return RT_EOK;
+}
+
+/*
+ **************************************************************************************************
+ *
  * olpc clock demo init & thread
  *
  **************************************************************************************************
  */
+
+/**
+ * olpc clock lut set.
+ */
+static rt_err_t olpc_clock_display_clear(void *parameter)
+{
+    rt_err_t ret = RT_EOK;
+    struct rt_display_lut lut0;
+    struct rt_device_graphic_info info;
+    struct olpc_clock_data *olpc_data = (struct olpc_clock_data *)parameter;
+
+    lut0.winId = CLOCK_RGB332_WIN;
+    lut0.format = RTGRAPHIC_PIXEL_FORMAT_RGB332;
+    lut0.lut  = bpp_lut;
+    lut0.size = sizeof(bpp_lut) / sizeof(bpp_lut[0]);
+    ret = rt_display_lutset(&lut0, 0, 0);
+    RT_ASSERT(ret == RT_EOK);
+
+    rt_device_t device = olpc_data->disp->device;
+    ret = rt_device_control(device, RTGRAPHIC_CTRL_GET_INFO, &info);
+    RT_ASSERT(ret == RT_EOK);
+
+    rt_display_win_clear(CLOCK_RGB332_WIN, RTGRAPHIC_PIXEL_FORMAT_RGB332, 0, WIN_LAYERS_H, 0);
+
+    return RT_EOK;
+}
+
+/**
+ * event table for task switch to.
+ */
+#define OLPC_CLOCK_HOME_ID_MAX  8
+static rt_uint32_t task_switch_table[OLPC_CLOCK_HOME_ID_MAX] =
+{
+    // 0
+    0,
+    // 1
+#if defined(OLPC_APP_BLN_ENABLE)
+    EVENT_APP_BLN,
+#else
+    0,
+#endif
+    // 2
+#if defined(OLPC_APP_XSCREEN_ENABLE)
+    EVENT_APP_XSCREEN,
+#else
+    0,
+#endif
+    // 3
+#if defined(OLPC_APP_NOTE_ENABLE)
+    EVENT_APP_NOTE,
+#else
+    0,
+#endif
+    // 4
+#if defined(OLPC_APP_SNAKE_ENABLE)
+    EVENT_APP_SNAKE,
+#else
+    0,
+#endif
+    // 5
+#if defined(OLPC_APP_EBOOK_ENABLE)
+    EVENT_APP_EBOOK,
+#else
+    0,
+#endif
+    // 6
+#if defined(OLPC_APP_BLOCK_ENABLE)
+    EVENT_APP_BLOCK,
+#else
+    0,
+#endif
+    // 7
+    7
+};
 
 /**
  * olpc clock dmeo thread.
@@ -2775,20 +2136,19 @@ static rt_err_t olpc_clock_lock_touch_unregister(void *parameter)
 static void olpc_clock_thread(void *p)
 {
     rt_err_t ret;
-    uint32_t event;
+    uint32_t event, exitevt = EVENT_APP_CLOCK;
     struct olpc_clock_data *olpc_data;
-    rt_uint8_t  home_id;
 
     olpc_data = (struct olpc_clock_data *)rt_malloc(sizeof(struct olpc_clock_data));
     RT_ASSERT(olpc_data != RT_NULL);
     rt_memset((void *)olpc_data, 0, sizeof(struct olpc_clock_data));
+    g_olpc_data = olpc_data;
 
     olpc_data->disp = rt_display_get_disp();
     RT_ASSERT(olpc_data->disp != RT_NULL);
 
-#if defined(RT_USING_TOUCH)
-    olpc_clock_screen_touch_register(olpc_data);
-#endif
+    ret = olpc_clock_display_clear(olpc_data);
+    RT_ASSERT(ret == RT_EOK);
 
     olpc_data->disp_event = rt_event_create("display_event", RT_IPC_FLAG_FIFO);
     RT_ASSERT(olpc_data->disp_event != RT_NULL);
@@ -2796,14 +2156,16 @@ static void olpc_clock_thread(void *p)
     ret = olpc_clock_init(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
-    ret = olpc_clock_lutset(olpc_data);
-    RT_ASSERT(ret == RT_EOK);
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+    rt_thread_t  rtt_bln = rt_thread_create("olpbln", olpc_bln_thread, RT_NULL, 2048, 4, 10);
+    RT_ASSERT(rtt_bln != RT_NULL);
+    rt_thread_startup(rtt_bln);
+#endif
 
-    rt_event_send(olpc_data->disp_event, EVENT_UPDATE_CLOCK);
-
+    rt_event_send(olpc_data->disp_event, EVENT_CLOCK_UPDATE);
     while (1)
     {
-        ret = rt_event_recv(olpc_data->disp_event, EVENT_UPDATE_CLOCK | EVENT_EXIT_CLOCK,
+        ret = rt_event_recv(olpc_data->disp_event, EVENT_CLOCK_UPDATE | EVENT_CLOCK_EXIT,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         if (ret != RT_EOK)
@@ -2811,22 +2173,34 @@ static void olpc_clock_thread(void *p)
             /* Reserved... */
         }
 
-        if (event & EVENT_UPDATE_CLOCK)
+        if (event & EVENT_CLOCK_UPDATE)
         {
             ret = olpc_clock_task_fun(olpc_data);
             RT_ASSERT(ret == RT_EOK);
         }
 
-        if (event & EVENT_EXIT_CLOCK)
+        if (event & EVENT_CLOCK_EXIT)
         {
-            break;
+            RT_ASSERT(olpc_data->home_id < OLPC_CLOCK_HOME_ID_MAX);
+            exitevt = task_switch_table[olpc_data->home_id];
+            if (exitevt != 0)
+            {
+                break;
+            }
         }
     }
 
-    /* Thread deinit */
-#if defined(RT_USING_TOUCH)
-    olpc_clock_screen_touch_unregister(olpc_data);
-    olpc_touch_list_clear();
+#if defined(OLPC_APP_CLOCK_BLN_ENABLE)
+    ret = rt_event_send(olpc_data->disp_event, EVENT_BLN_EXIT);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_event_recv(olpc_data->disp_event, EVENT_BLN_EXIT_DONE,
+                        RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
+                        RT_WAITING_FOREVER, &event);
+    RT_ASSERT(ret == RT_EOK);
+
+    ret = rt_thread_delete(rtt_bln);
+    RT_ASSERT(ret == RT_EOK);
 #endif
 
     olpc_clock_deinit(olpc_data);
@@ -2834,46 +2208,10 @@ static void olpc_clock_thread(void *p)
     rt_event_delete(olpc_data->disp_event);
     olpc_data->disp_event = RT_NULL;
 
-    home_id = olpc_data->home_id;
     rt_free(olpc_data);
     olpc_data = RT_NULL;
 
-    if (home_id == 1)
-    {
-#if defined(OLPC_APP_BLN_ENABLE)
-        rt_event_send(olpc_main_event, EVENT_APP_BLN);
-#endif
-    }
-    else if (home_id == 2)
-    {
-#if defined(OLPC_APP_XSCREEN_ENABLE)
-        rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
-#endif
-    }
-    else if (home_id == 3)
-    {
-#if defined(OLPC_APP_NOTE_ENABLE)
-        rt_event_send(olpc_main_event, EVENT_APP_NOTE);
-#endif
-    }
-    else if (home_id == 4)
-    {
-#if defined(OLPC_APP_SNAKE_ENABLE)
-        rt_event_send(olpc_main_event, EVENT_APP_SNAKE);
-#endif
-    }
-    else if (home_id == 5)
-    {
-#if defined(OLPC_APP_EBOOK_ENABLE)
-        rt_event_send(olpc_main_event, EVENT_APP_EBOOK);
-#endif
-    }
-    else if (home_id == 6)
-    {
-#if defined(OLPC_APP_BLOCK_ENABLE)
-        rt_event_send(olpc_main_event, EVENT_APP_BLOCK);
-#endif
-    }
+    rt_event_send(olpc_main_event, exitevt);
 }
 
 /**
@@ -2881,9 +2219,7 @@ static void olpc_clock_thread(void *p)
  */
 int olpc_clock_app_init(void)
 {
-    rt_thread_t rtt_clock;
-
-    rtt_clock = rt_thread_create("olpcclock", olpc_clock_thread, RT_NULL, 2048, 5, 10);
+    rt_thread_t  rtt_clock = rt_thread_create("olpclk", olpc_clock_thread, RT_NULL, 2048, 5, 10);
     RT_ASSERT(rtt_clock != RT_NULL);
     rt_thread_startup(rtt_clock);
 

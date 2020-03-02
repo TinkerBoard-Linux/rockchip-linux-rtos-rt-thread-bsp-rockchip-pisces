@@ -64,6 +64,11 @@ struct rt_display_config
     struct rt_display_config *next;
 
     rt_uint8_t  winId;
+    rt_uint8_t  zpos;
+    rt_uint8_t  format;
+    rt_uint32_t *lut;
+    rt_uint32_t lutsize;
+
     rt_uint8_t  *fb;
     rt_uint32_t fblen;
     rt_uint32_t colorkey;
@@ -80,16 +85,31 @@ struct rt_display_config
     rt_uint8_t  globalAlphaValue;
 };
 
+typedef enum
+{
+    WIN_BOTTOM_LAYER = 0,
+    WIN_MIDDLE_LAYER,
+    WIN_TOP_LAYER,
+    WIN_MAX_LAYER
+} WINLAYER_ID;
+
+struct rt_display_mq_t
+{
+    rt_uint8_t cfgsta;                              // config status(bit 2-0), 0: unused, 1 used;
+    struct rt_display_config win[WIN_MAX_LAYER];    // layers(bottom --> top): 0 --> 1 --> 2
+    rt_err_t (*disp_finish)(void);
+};
+
 struct rt_display_data
 {
     rt_device_t device;
+    rt_mq_t     disp_mq;
     struct rt_device_graphic_info info;
     struct rt_display_lut lut[3];
 
     rt_uint16_t xres;
     rt_uint16_t yres;
-
-    rt_uint16_t  blval;
+    rt_uint16_t blval;
 };
 typedef struct rt_display_data *rt_display_data_t;
 
