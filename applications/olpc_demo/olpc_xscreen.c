@@ -177,35 +177,22 @@ static rt_err_t olpc_xscreen_init(struct olpc_xscreen_data *olpc_data)
         FIRMWARE_REQ_PARAM  Param;
         FIRMWARE_REQ_PARAM *pParam = &Param;
 
-        rt_memset(pParam, 0, sizeof(FIRMWARE_REQ_PARAM));
         for (i = 0; i < XSCREEN_PIC_MAX_NUM; i++)
         {
+            rt_memset(pParam, 0, sizeof(FIRMWARE_REQ_PARAM));
+
             pParam->id   = i + SEGMENT_ID_OLPC_XSCREEN_RES00;
             pParam->type = SEGMENT_TEXT;
-#if 0
-            {
-                olpc_firmware_content_request(pParam);
 
-                xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_dma_malloc_dtcm((rt_uint32_t)pParam->info.CodeImageLength);
-                RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
+            ret = olpc_ap_command(FIRMWARE_INFO_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
+            RT_ASSERT(ret == RT_EOK);
 
-                rt_memcpy((rt_uint8_t *)xscreen_pages_num[i]->data,
-                          (rt_uint8_t *)pParam->info.CodeImageBase,
-                          (rt_uint32_t)pParam->info.CodeImageLength);
-            }
-#else
-            {
-                ret = olpc_ap_command(FIRMWARE_INFO_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
-                RT_ASSERT(ret == RT_EOK);
+            xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_dma_malloc_dtcm((rt_uint32_t)pParam->info.CodeImageLength);
+            RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
 
-                xscreen_pages_num[i]->data  = (const rt_uint8_t *)rt_dma_malloc_dtcm((rt_uint32_t)pParam->info.CodeImageLength);
-                RT_ASSERT(xscreen_pages_num[i]->data != RT_NULL);
-
-                pParam->buf = (rt_uint8_t *)xscreen_pages_num[i]->data;
-                ret = olpc_ap_command(FIRMWARE_DOWNLOAD_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
-                RT_ASSERT(ret == RT_EOK);
-            }
-#endif
+            pParam->buf = (rt_uint8_t *)xscreen_pages_num[i]->data;
+            ret = olpc_ap_command(FIRMWARE_DOWNLOAD_REQ, pParam, sizeof(FIRMWARE_REQ_PARAM));
+            RT_ASSERT(ret == RT_EOK);
         }
     }
 

@@ -230,7 +230,7 @@ struct olpc_clock_data
 #endif
 };
 
-struct static olpc_clock_data *g_olpc_data = RT_NULL;
+static struct olpc_clock_data *g_olpc_data = RT_NULL;
 
 /*
  **************************************************************************************************
