@@ -59,7 +59,7 @@ static rt_err_t olpc_firmware_request(rt_uint32_t id)
 }
 #endif
 
-#if defined(RT_USING_CUSTOM_DLMODULE)
+#if defined(OLPC_DLMODULE_ENABLE)
 /**
  * dlmodule request hook.
  */
@@ -136,6 +136,8 @@ static void olpc_apps_init(void)
     rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
 #elif defined(OLPC_APP_BLN_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_BLN);
+#elif defined(OLPC_APP_LYRIC_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_LYRIC);
 #endif
 }
 
@@ -159,7 +161,7 @@ static void olpc_main_thread(void *p)
     RT_ASSERT(olpc_main_event != RT_NULL);
     olpc_apps_init();
 
-#if defined(RT_USING_CUSTOM_DLMODULE)
+#if defined(OLPC_DLMODULE_ENABLE)
     olpc_dlmodule_exec("hello.mo");
 #endif
 
@@ -167,7 +169,7 @@ static void olpc_main_thread(void *p)
     {
         ret = rt_event_recv(olpc_main_event,
                             EVENT_APP_CLOCK | EVENT_APP_EBOOK | EVENT_APP_BLOCK | EVENT_APP_SNAKE |
-                            EVENT_APP_NOTE  | EVENT_APP_XSCREEN | EVENT_APP_BLN,
+                            EVENT_APP_NOTE  | EVENT_APP_XSCREEN | EVENT_APP_BLN | EVENT_APP_LYRIC,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         RT_ASSERT(ret == RT_EOK);
@@ -316,7 +318,31 @@ static void olpc_main_thread(void *p)
             olpc_apps_init();
 #endif
         }
-        else /*if (event & EVENT_APP_XSCREEN)*/
+        else if (event & EVENT_APP_LYRIC)
+        {
+#if defined(OLPC_APP_LYRIC_ENABLE)
+            ret = RT_ERROR;
+#if defined (OLPC_DLMODULE_ENABLE)
+            ret = olpc_dlmodule_exec("lyric.mo");
+#elif defined (OLPC_OVERLAY_ENABLE)
+            ret = olpc_firmware_request(SEGMENT_ID_OLPC_LYRIC);
+            if (ret == RT_EOK)
+            {
+                ret = olpc_lyric_app_init();
+            }
+#elif defined (OLPC_STATICLD_ENABLE)
+            ret = olpc_lyric_app_init();
+#endif
+            if (ret)
+            {
+                rt_kprintf("olpc_start_app_xscreen error!!!\n");
+                olpc_apps_init();
+            }
+#else
+            olpc_apps_init();
+#endif
+        }
+        else if (event & EVENT_APP_XSCREEN)
         {
 #if defined(OLPC_APP_XSCREEN_ENABLE)
             ret = RT_ERROR;

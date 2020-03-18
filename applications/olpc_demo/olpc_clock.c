@@ -2089,7 +2089,11 @@ static rt_err_t olpc_clock_display_clear(void *parameter)
 static rt_uint32_t task_switch_table[OLPC_CLOCK_HOME_ID_MAX] =
 {
     // 0
+#if defined(OLPC_APP_LYRIC_ENABLE)
+    EVENT_APP_LYRIC,
+#else
     0,
+#endif
     // 1
 #if defined(OLPC_APP_BLN_ENABLE)
     EVENT_APP_BLN,

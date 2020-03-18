@@ -47,6 +47,7 @@
 #define EVENT_APP_NOTE      (0x01UL << 4)
 #define EVENT_APP_XSCREEN   (0x01UL << 5)
 #define EVENT_APP_BLN       (0x01UL << 6)
+#define EVENT_APP_LYRIC     (0x01UL << 7)
 
 /**
  * Global data struct for olpc display demo
@@ -112,6 +113,28 @@ struct rt_display_data
     rt_uint16_t blval;
 };
 typedef struct rt_display_data *rt_display_data_t;
+
+typedef struct
+{
+    uint32_t w_px         : 8;
+    uint32_t glyph_index  : 24;
+} copy_lv_font_glyph_dsc_t;
+
+typedef struct _copy_lv_font_struct
+{
+    uint32_t unicode_first;
+    uint32_t unicode_last;
+    const uint8_t *glyph_bitmap;
+    const copy_lv_font_glyph_dsc_t *glyph_dsc;
+    const uint32_t *unicode_list;
+    const uint8_t *(*get_bitmap)(const struct _copy_lv_font_struct *, uint32_t);     /*Get a glyph's  bitmap from a font*/
+    int16_t (*get_width)(const struct _copy_lv_font_struct *, uint32_t);       /*Get a glyph's with with a given font*/
+    struct _copy_lv_font_struct *next_page;     /*Pointer to a font extension*/
+    uint32_t h_px       : 8;
+    uint32_t bpp        : 4;               /*Bit per pixel: 1, 2 or 4*/
+    uint32_t monospace  : 8;               /*Fix width (0: normal width)*/
+    uint16_t glyph_cnt;                    /*Number of glyphs (letters) in the font*/
+} copy_lv_font_t;
 
 /**
  * color palette for RGB332
@@ -244,11 +267,17 @@ int olpc_snake_app_init(void);
 /**
  * olpc xscreen demo application init.
  */
+
 int olpc_xscreen_app_init(void);
 /**
  * olpc bln demo application init.
  */
 int olpc_bln_app_init(void);
+
+/**
+ * olpc lyric demo application init.
+ */
+int olpc_lyric_app_init(void);
 
 /**
  * screen protection API.

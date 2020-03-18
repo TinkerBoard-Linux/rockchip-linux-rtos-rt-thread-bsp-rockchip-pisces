@@ -218,8 +218,24 @@ SECTIONS
     __olpbln_text_len = SIZEOF(.olpc_bln_text);
     __olpapps_text_len  = MAX(__olpapps_text_len, __olpbln_text_len);
 
+    /* olpc lyric */
+    __olplyric_text_lma = __olpbln_text_lma + __olpbln_text_len;
+    __olplyric_text_vma = __olpapps_text_vma;
+    .olpc_lyric_text (__olplyric_text_vma) : AT (__olplyric_text_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/olpc_lyric.o(.text*)
+        */olpc_demo/resource/lyric_fonts*.o(.text*)
+
+        */olpc_demo/olpc_lyric.o(.rodata*)
+        */olpc_demo/resource/lyric_fonts*.o(.rodata*)
+        . = ALIGN(32);
+    }
+    __olplyric_text_len = SIZEOF(.olpc_lyric_text);
+    __olpapps_text_len  = MAX(__olpapps_text_len, __olplyric_text_len);
+
     /* olpc xscreen */
-    __olpxscreen_text_lma = __olpbln_text_lma + __olpbln_text_len;
+    __olpxscreen_text_lma = __olplyric_text_lma + __olplyric_text_len;
     __olpxscreen_text_vma = __olpapps_text_vma;
     .olpc_xscreen_text (__olpxscreen_text_vma) : AT (__olpxscreen_text_lma)
     {
@@ -680,8 +696,21 @@ SECTIONS
     __olpbln_data_len = SIZEOF(.olpc_bln_data);
     __olpapps_data_len  = MAX(__olpapps_data_len, __olpbln_data_len);
 
+    /* olpc lyric */
+    __olplyric_data_lma = __olpbln_data_lma + __olpbln_data_len;
+    __olplyric_data_vma = __olpapps_data_vma;
+    .olpc_lyric_data (__olplyric_data_vma) : AT (__olplyric_data_lma)
+    {
+        . = ALIGN(32);
+        */olpc_demo/olpc_lyric.o(.data*)
+        */olpc_demo/resource/lyric_fonts*.o(.data*)
+        . = ALIGN(32);
+    }
+    __olplyric_data_len = SIZEOF(.olpc_lyric_data);
+    __olpapps_data_len  = MAX(__olpapps_data_len, __olplyric_data_len);
+
     /* olpc xscreen */
-    __olpxscreen_data_lma = __olpbln_data_lma + __olpbln_data_len;
+    __olpxscreen_data_lma = __olplyric_data_lma + __olplyric_data_len;
     __olpxscreen_data_vma = __olpapps_data_vma;
     .olpc_xscreen_data (__olpxscreen_data_vma) : AT (__olpxscreen_data_lma)
     {
@@ -797,6 +826,19 @@ SECTIONS
     }
     __olpbln_bss_len = SIZEOF(.olpc_bln_bss);
     __olpapps_bss_len  = MAX(__olpapps_bss_len, __olpbln_bss_len);
+
+    /* olpc lyric */
+    . = __olpapps_bss_vma;
+    __olplyric_bss_vma = .;
+    .olpc_lyric_bss (NOLOAD):
+    {
+        . = ALIGN(32);
+        */olpc_demo/olpc_lyric.o(.bss*)
+        */olpc_demo/resource/lyric_fonts*.o(.bss*)
+        . = ALIGN(32);
+    }
+    __olplyric_bss_len = SIZEOF(.olpc_lyric_bss);
+    __olpapps_bss_len  = MAX(__olpapps_bss_len, __olplyric_bss_len);
 
     /* olpc xscreen */
     . = __olpapps_bss_vma;
