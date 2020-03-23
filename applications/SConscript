@@ -1,15 +1,16 @@
-# for third party compiling
+# for olpc_demo apps compiling
 import os
 import rtconfig
 from building import *
 
 cwd = GetCurrentDir()
 objs = []
-list = os.listdir(cwd)
 
-for d in list:
-    path = os.path.join(cwd, d)
-    if os.path.isfile(os.path.join(path, 'SConscript')):
-        objs = objs + SConscript(os.path.join(d, 'SConscript'))
+if GetDepend(['RT_USING_OLPC_DEMO']):
+    objs += SConscript(os.path.join('common', 'SConscript'))
+    objs += SConscript(os.path.join('scrprotect', 'SConscript'))
+
+    if not GetDepend(['OLPC_DLMODULE_ENABLE']):
+        objs += SConscript(os.path.join('olpc_demo', 'SConscript'))
 
 Return('objs')

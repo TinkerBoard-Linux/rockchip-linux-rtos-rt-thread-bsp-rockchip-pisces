@@ -13,8 +13,6 @@ if RT_USING_OLPC_DEMO
         config OLPC_DLMODULE_ENABLE
             bool "dynamic load mode"
             depends on RT_USING_CUSTOM_DLMODULE
-        config OLPC_OVERLAY_ENABLE
-            bool "overlay load mode"
     endchoice
 
     config OLPC_APP_SRCSAVER_ENABLE
