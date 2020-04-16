@@ -63,6 +63,7 @@ static const struct clk_init clk_inits[] =
     INIT_CLK("PCLK_ALIVE", PCLK_ALIVE, 100 * MHZ),
     INIT_CLK("HCLK_ALIVE", HCLK_ALIVE, 100 * MHZ),
     INIT_CLK("CLK_SPI1", CLK_SPI1, 50 * MHZ),
+    { /* sentinel */ },
 };
 
 static const struct clk_unused clks_unused[] =
@@ -77,6 +78,7 @@ static const struct clk_unused clks_unused[] =
     {0, 12, 0x90769076},
     {0, 13, 0xffffffff},
     {0, 14, 0xfefffeff},
+    { /* sentinel */ },
 };
 #endif
 
@@ -280,6 +282,7 @@ static struct regulator_desc regulators[] =
                     PWR_DESC_LINEAR_VOLT(750000, 1100000, 50000),
         },
     },
+    { /* sentinel */ },
 };
 
 const struct regulator_init regulator_inits[] =
@@ -292,15 +295,17 @@ const struct regulator_init regulator_inits[] =
 
 #ifdef RT_USING_PM_REQ_PWR
 static uint32_t core_pwr_req[3];
+#define CORE_PWR_REQ_CNT 3
 static struct req_pwr_desc req_pwr_array[] =
 {
     {
         .pwr_id = PWR_ID_CORE,
         .req_ctrl = {
-            .info.ttl_req = HAL_ARRAY_SIZE(core_pwr_req), /* for core & shrm */
+            .info.ttl_req = CORE_PWR_REQ_CNT, /* for core & shrm */
             .req_vals = &core_pwr_req[0],
         }
-    }
+    },
+    { /* sentinel */ },
 };
 #endif
 
@@ -315,6 +320,7 @@ const static struct dvfs_table dvfs_core_table[] =
         .freq = 198000000,
         .volt = 800000,
     },
+    { /* sentinel */ },
 };
 
 const static struct dvfs_table dvfs_shrm_table[] =
@@ -327,6 +333,7 @@ const static struct dvfs_table dvfs_shrm_table[] =
         .freq = 198000000,
         .volt = 800000,
     },
+    { /* sentinel */ },
 };
 
 const static struct dvfs_table dvfs_dsp_table[] =
@@ -343,6 +350,7 @@ const static struct dvfs_table dvfs_dsp_table[] =
         .freq = 198000000,
         .volt = 800000,
     },
+    { /* sentinel */ },
 };
 
 struct rk_dvfs_desc dvfs_data[] =
@@ -352,22 +360,20 @@ struct rk_dvfs_desc dvfs_data[] =
         .pwr_id = PWR_ID_CORE,
         .tbl_idx = 1,
         .table = &dvfs_shrm_table[0],
-        .tbl_cnt = HAL_ARRAY_SIZE(dvfs_shrm_table),
     },
     {
         .clk_id = HCLK_M4,
         .pwr_id = PWR_ID_CORE,
         .tbl_idx = 1,
         .table = &dvfs_core_table[0],
-        .tbl_cnt = HAL_ARRAY_SIZE(dvfs_core_table),
     },
     {
         .clk_id = ACLK_DSP,
         .pwr_id = PWR_ID_CORE,
         .tbl_idx = 2,
         .table = &dvfs_dsp_table[0],
-        .tbl_cnt = HAL_ARRAY_SIZE(dvfs_dsp_table),
-    }
+    },
+    { /* sentinel */ },
 };
 
 static struct pm_mode_dvfs pm_mode_data[] =
@@ -382,6 +388,7 @@ static struct pm_mode_dvfs pm_mode_data[] =
         .run_tbl_idx = { 1, 1, 1 },
         .sleep_tbl_idx = 1,
     },
+    { /* sentinel */ },
 };
 #endif
 
@@ -416,9 +423,9 @@ void rt_hw_board_init()
 #endif
 
 #ifdef RT_USING_CRU
-    clk_init(clk_inits, HAL_ARRAY_SIZE(clk_inits), true);
+    clk_init(clk_inits, true);
     /* disable some clks when init, and enabled by device when needed */
-    clk_disable_unused(clks_unused, HAL_ARRAY_SIZE(clks_unused));
+    clk_disable_unused(clks_unused);
     if (RT_CONSOLE_DEVICE_UART(0))
         CRU->CRU_CLKGATE_CON[2] = 0x08860886;
     else if (RT_CONSOLE_DEVICE_UART(1))
@@ -448,16 +455,16 @@ void rt_hw_board_init()
 #endif
 
 #ifdef HAL_PWR_MODULE_ENABLED
-    regulator_desc_init(regulators, HAL_ARRAY_SIZE(regulators));
+    regulator_desc_init(regulators);
 #endif
 
 #ifdef RT_USING_PM_REQ_PWR
-    regulator_req_desc_init(req_pwr_array, HAL_ARRAY_SIZE(req_pwr_array));
+    regulator_req_desc_init(req_pwr_array);
 #endif
 
 #ifdef RT_USING_PM_DVFS
-    dvfs_desc_init(dvfs_data, HAL_ARRAY_SIZE(dvfs_data));
-    rkpm_register_dvfs_info(pm_mode_data, HAL_ARRAY_SIZE(pm_mode_data), 0);
+    dvfs_desc_init(dvfs_data);
+    rkpm_register_dvfs_info(pm_mode_data, 0);
 #endif
 
     /* hal bsp init */

@@ -29,6 +29,7 @@ static const struct clk_init clk_inits[] =
     INIT_CLK("ACLK_LOGIC", ACLK_LOGIC, 300000000),
     INIT_CLK("HCLK_LOGIC", HCLK_LOGIC, 150000000),
     INIT_CLK("PCLK_LOGIC", PCLK_LOGIC, 150000000),
+    { /* sentinel */ },
 };
 
 #if defined(RT_USING_UART0)
@@ -142,7 +143,7 @@ void rt_hw_board_init()
 
     rt_hw_cpu_cache_init();
 
-    clk_init(clk_inits, HAL_ARRAY_SIZE(clk_inits), true);
+    clk_init(clk_inits, true);
 
 #ifdef RT_USING_CONSOLE
     rt_console_set_device(RT_CONSOLE_DEVICE_NAME);
