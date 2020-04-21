@@ -181,12 +181,12 @@ menu "Enable Audio"
 endmenu
 endif
 
-menuconfig RT_USING_TOUCH
+menuconfig RT_USING_PISCES_TOUCH
     bool "Enable Touch"
     default n
 
-if RT_USING_TOUCH
-    config RT_USING_TOUCH_ASYNC
+if RT_USING_PISCES_TOUCH
+    config RT_USING_PISCES_TOUCH_ASYNC
         bool "Enable Touch Async"
         default y
 endif

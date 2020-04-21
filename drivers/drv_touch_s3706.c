@@ -15,7 +15,7 @@
 #include <hal_base.h>
 #include <rthw.h>
 
-#ifdef RT_USING_TOUCH
+#ifdef RT_USING_PISCES_TOUCH
 
 #include <drv_touch.h>
 #include <drv_touch_s3706.h>
@@ -254,7 +254,7 @@ static rt_err_t s3706_touch_handle(touch_device_t *dev)
 
     tp_dbg("points: x = 0x%x, y = 0x%x, z = 0x%x.\n", dev->points[0].x, dev->points[0].y, dev->points[0].z);
 
-#ifdef RT_USING_TOUCH_ASYNC
+#ifdef RT_USING_PISCES_TOUCH_ASYNC
     ret = rt_mq_send(&dev->tp_mq, dev->points, POINT_INFO_LEN);
     RT_ASSERT(ret == RT_EOK);
 #endif
@@ -490,7 +490,7 @@ int rt_hw_touch_init(void)
     g_touch_dev.read_mutex = rt_mutex_create("s3706_read_mutex", RT_IPC_FLAG_FIFO);
     RT_ASSERT(g_touch_dev.read_mutex != RT_NULL);
 
-#ifdef RT_USING_TOUCH_ASYNC
+#ifdef RT_USING_PISCES_TOUCH_ASYNC
     /* init message queue */
 
     result = rt_mq_init(&g_touch_dev.tp_mq,
@@ -513,4 +513,4 @@ int rt_hw_touch_init(void)
 }
 INIT_ENV_EXPORT(rt_hw_touch_init);
 
-#endif /* RT_USING_TOUCH*/
+#endif /* RT_USING_PISCES_TOUCH*/

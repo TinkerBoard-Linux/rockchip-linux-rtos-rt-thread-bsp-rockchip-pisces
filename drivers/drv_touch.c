@@ -15,7 +15,7 @@
 #include <rtdevice.h>
 #include <hal_base.h>
 
-#ifdef RT_USING_TOUCH
+#ifdef RT_USING_PISCES_TOUCH
 
 #include "drv_touch.h"
 #include "drv_touch_s3706.h"
@@ -110,5 +110,5 @@ rt_err_t rt_hw_touch_register(struct rt_touch_device *touch,
     return ret;
 }
 
-#endif /* RT_USING_TOUCH */
+#endif /* RT_USING_PISCES_TOUCH */
 

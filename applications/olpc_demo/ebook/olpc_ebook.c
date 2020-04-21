@@ -11,7 +11,7 @@
 #include "applications/common/image_info.h"
 #include "applications/common/olpc_display.h"
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 #include "drv_touch.h"
 #include "applications/common/olpc_touch.h"
 #endif
@@ -248,7 +248,7 @@ static rt_err_t olpc_ebook_task_fun(struct olpc_ebook_data *olpc_data)
  *
  **************************************************************************************************
  */
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * screen touch.
  */
@@ -451,7 +451,7 @@ static rt_err_t olpc_ebook_screen_protection_enter(void *parameter)
 
     rt_timer_stop(olpc_data->srctimer);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_ebook_screen_touch_unregister(parameter);
     olpc_touch_list_clear();
 #endif
@@ -471,7 +471,7 @@ static rt_err_t olpc_ebook_screen_protection_exit(void *parameter)
 
     olpc_ebook_lutset(olpc_data);   // reset lut
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_ebook_screen_touch_register(parameter);
 #endif
 
@@ -511,7 +511,7 @@ static void olpc_ebook_thread(void *p)
     ret = olpc_ebook_lutset(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_ebook_screen_touch_register(olpc_data);
 #endif
 
@@ -578,7 +578,7 @@ static void olpc_ebook_thread(void *p)
     RT_ASSERT(ret == RT_EOK);
 #endif
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_ebook_screen_touch_unregister(olpc_data);
     olpc_touch_list_clear();
 #endif

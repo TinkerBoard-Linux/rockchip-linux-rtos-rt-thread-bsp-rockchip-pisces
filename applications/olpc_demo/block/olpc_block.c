@@ -11,7 +11,7 @@
 #include "applications/common/image_info.h"
 #include "applications/common/olpc_display.h"
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 #include "drv_touch.h"
 #include "applications/common/olpc_touch.h"
 #endif
@@ -114,7 +114,6 @@ extern image_info_t block_num7_info;
 extern image_info_t block_num8_info;
 extern image_info_t block_num9_info;
 
-#if defined(RT_USING_TOUCH)
 extern image_info_t block_ctrl_info;
 extern image_info_t block_btnup0_info;
 extern image_info_t block_btnup1_info;
@@ -130,7 +129,6 @@ extern image_info_t block_exit0_info;
 extern image_info_t block_exit1_info;
 extern image_info_t block_pause0_info;
 extern image_info_t block_pause1_info;
-#endif
 
 static void block_game_stop(void *parameter);
 static void block_game_draw_block(void *parameter);
@@ -1533,7 +1531,7 @@ static rt_err_t olpc_block_task_fun(struct olpc_block_data *olpc_data)
  *
  **************************************************************************************************
  */
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 
 /**
  * left button touch.
@@ -1929,7 +1927,7 @@ static void olpc_block_screen_timer_start(void *parameter)
 {
     struct olpc_block_data *olpc_data = (struct olpc_block_data *)parameter;
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_block_screen_touch_register(parameter);
 #endif
 
@@ -1942,7 +1940,7 @@ static void olpc_block_screen_timer_stop(void *parameter)
 
     rt_timer_stop(olpc_data->srctimer);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_block_screen_touch_unregister(parameter);
 #endif
 }
@@ -1954,7 +1952,7 @@ static rt_err_t olpc_block_screen_protection_enter(void *parameter)
 {
     olpc_block_screen_timer_stop(parameter);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_block_touch_unregister(parameter);
     olpc_touch_list_clear();
 #endif
@@ -1973,7 +1971,7 @@ static rt_err_t olpc_block_screen_protection_exit(void *parameter)
 
     olpc_block_lutset(olpc_data);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_block_touch_register(parameter);
 #endif
     olpc_block_screen_timer_start(parameter);
@@ -2038,7 +2036,7 @@ static void olpc_block_thread(void *p)
     ret = olpc_block_init(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_block_touch_register(olpc_data);
 #endif
 
@@ -2102,7 +2100,7 @@ static void olpc_block_thread(void *p)
     olpc_data->srctimer = RT_NULL;
 #endif
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_block_touch_unregister(olpc_data);
     olpc_touch_list_clear();
 #endif

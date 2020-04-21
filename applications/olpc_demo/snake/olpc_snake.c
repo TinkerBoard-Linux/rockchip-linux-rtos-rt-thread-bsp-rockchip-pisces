@@ -11,7 +11,7 @@
 #include "applications/common/image_info.h"
 #include "applications/common/olpc_display.h"
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 #include "drv_touch.h"
 #include "applications/common/olpc_touch.h"
 #endif
@@ -122,7 +122,6 @@ extern image_info_t snake_num7_info;
 extern image_info_t snake_num8_info;
 extern image_info_t snake_num9_info;
 
-#if defined(RT_USING_TOUCH)
 extern image_info_t snake_play0_info;
 extern image_info_t snake_pause0_info;
 extern image_info_t snake_exit0_info;
@@ -135,7 +134,6 @@ extern image_info_t snake_left0_info;
 extern image_info_t snake_left1_info;
 extern image_info_t snake_right0_info;
 extern image_info_t snake_right1_info;
-#endif
 
 #if defined(OLPC_APP_SRCSAVER_ENABLE)
 static void olpc_snake_screen_timer_start(void *parameter);
@@ -1230,7 +1228,7 @@ static rt_err_t olpc_snake_task_fun(struct olpc_snake_data *olpc_data)
  *
  **************************************************************************************************
  */
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 
 /**
  * left button touch.
@@ -1600,7 +1598,7 @@ static void olpc_snake_screen_timer_start(void *parameter)
 {
     struct olpc_snake_data *olpc_data = (struct olpc_snake_data *)parameter;
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_snake_screen_touch_register(parameter);
 #endif
 
@@ -1613,7 +1611,7 @@ static void olpc_snake_screen_timer_stop(void *parameter)
 
     rt_timer_stop(olpc_data->srctimer);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_snake_screen_touch_unregister(parameter);
 #endif
 }
@@ -1625,7 +1623,7 @@ static rt_err_t olpc_snake_screen_protection_enter(void *parameter)
 {
     olpc_snake_screen_timer_stop(parameter);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_snake_touch_unregister(parameter);
     olpc_touch_list_clear();
 #endif
@@ -1644,7 +1642,7 @@ static rt_err_t olpc_snake_screen_protection_exit(void *parameter)
 
     olpc_snake_lutset(olpc_data);    //reset lut
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_snake_touch_register(parameter);
 #endif
     olpc_snake_screen_timer_start(parameter);
@@ -1697,7 +1695,7 @@ static void olpc_snake_thread(void *p)
     ret = olpc_snake_init(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_snake_touch_register(olpc_data);
 #endif
 
@@ -1761,7 +1759,7 @@ static void olpc_snake_thread(void *p)
     olpc_data->srctimer = RT_NULL;
 #endif
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_snake_touch_unregister(olpc_data);
     olpc_touch_list_clear();
 #endif

@@ -11,7 +11,7 @@
  * Revision 1.1, 2019-08-01, zhoufeng@swdp, initial touch function
  ****************************************************************/
 #include <rtthread.h>
-#if defined(RT_USING_OLPC_DEMO) && defined(RT_USING_TOUCH)
+#if defined(RT_USING_OLPC_DEMO) && defined(RT_USING_PISCES_TOUCH)
 #include <rtdevice.h>
 
 #include <drv_touch.h>

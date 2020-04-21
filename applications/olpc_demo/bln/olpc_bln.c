@@ -12,7 +12,7 @@
 #include "applications/common/olpc_display.h"
 #include "applications/common/olpc_ap.h"
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 #include "drv_touch.h"
 #include "applications/common/olpc_touch.h"
 #endif
@@ -782,7 +782,7 @@ static rt_err_t olpc_bln_task_fun(struct olpc_bln_data *olpc_data)
  *
  **************************************************************************************************
  */
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * screen touch.
  */
@@ -887,7 +887,7 @@ static void olpc_bln_thread(void *p)
     ret = olpc_bln_lutset(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_bln_screen_touch_register(olpc_data);
 #endif
 
@@ -936,7 +936,7 @@ static void olpc_bln_thread(void *p)
     RT_ASSERT(ret == RT_EOK);
     olpc_data->timer = RT_NULL;
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_bln_screen_touch_unregister(olpc_data);
     olpc_touch_list_clear();
 #endif

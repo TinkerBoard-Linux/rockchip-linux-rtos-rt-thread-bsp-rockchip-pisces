@@ -11,7 +11,7 @@
 #include "applications/common/image_info.h"
 #include "applications/common/olpc_display.h"
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 #include "drv_touch.h"
 #include "applications/common/olpc_touch.h"
 #endif
@@ -240,7 +240,7 @@ static struct olpc_clock_data *g_olpc_data = RT_NULL;
  **************************************************************************************************
  */
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 static rt_err_t olpc_clock_screen_touch_register(void *parameter);
 static rt_err_t olpc_clock_screen_touch_unregister(void *parameter);
 static rt_err_t olpc_clock_home_touch_register(void *parameter);
@@ -1270,7 +1270,7 @@ static rt_err_t olpc_clock_home_region_refresh(struct olpc_clock_data *olpc_data
     return RT_EOK;
 }
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * home item touch.
  */
@@ -1445,7 +1445,7 @@ static rt_err_t olpc_clock_fingerprint_region_refresh(struct olpc_clock_data *ol
     return RT_EOK;
 }
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * fingerprint touch.
  */
@@ -1585,7 +1585,7 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
         {
             unlock_flag = 0;
             rt_memset((void *)wincfg->fb, 0x00, wincfg->fblen);
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
             olpc_clock_lock_touch_unregister(olpc_data);
             olpc_clock_home_touch_register(olpc_data);
             olpc_clock_fingerprint_touch_register(olpc_data);
@@ -1601,7 +1601,7 @@ static rt_err_t olpc_clock_lock_region_refresh(struct olpc_clock_data *olpc_data
     return RT_EOK;
 }
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * lock touch.
  */
@@ -1695,7 +1695,7 @@ static rt_err_t olpc_clock_lock_touch_unregister(void *parameter)
  *
  **************************************************************************************************
  */
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * screen touch.
  */
@@ -1772,7 +1772,7 @@ static void olpc_screen_timeout(void *parameter)
 
     if (olpc_data->screen_sta == SCREEN_HOME)
     {
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
         olpc_clock_home_touch_unregister(olpc_data);
         olpc_clock_fingerprint_touch_unregister(olpc_data);
 #endif
@@ -1782,7 +1782,7 @@ static void olpc_screen_timeout(void *parameter)
     }
     else if (olpc_data->screen_sta == SCREEN_LOCK)
     {
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
         olpc_clock_lock_touch_unregister(olpc_data);
 #endif
         olpc_data->screen_sta = SCREEN_OFF;
@@ -1884,7 +1884,7 @@ static rt_err_t olpc_clock_init(struct olpc_clock_data *olpc_data)
     RT_ASSERT(olpc_data->clock_timer != RT_NULL);
     rt_timer_start(olpc_data->clock_timer);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_clock_screen_touch_register(olpc_data);
 #endif
 
@@ -1898,7 +1898,7 @@ static void olpc_clock_deinit(struct olpc_clock_data *olpc_data)
 {
     rt_err_t ret;
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_clock_screen_touch_unregister(olpc_data);
     olpc_touch_list_clear();
 #endif

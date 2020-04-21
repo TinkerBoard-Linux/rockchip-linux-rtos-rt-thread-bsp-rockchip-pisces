@@ -11,7 +11,7 @@
 #include "applications/common/image_info.h"
 #include "applications/common/olpc_display.h"
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 #include "drv_touch.h"
 #include "applications/common/olpc_touch.h"
 #endif
@@ -162,7 +162,7 @@ extern image_info_t note_prevpage_info;
 static image_info_t save_item;
 #endif
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 static rt_err_t olpc_note_subbtnline_touch_register(void *parameter);
 static rt_err_t olpc_note_subbtnline_touch_unregister(void *parameter);
 
@@ -714,7 +714,7 @@ static rt_err_t olpc_note_task_fun(struct olpc_note_data *olpc_data)
  *
  **************************************************************************************************
  */
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
 /**
  * screen touch.
  */
@@ -1723,7 +1723,7 @@ static rt_err_t olpc_note_screen_protection_enter(void *parameter)
 
     rt_timer_stop(olpc_data->srctimer);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_note_touch_unregister(parameter);
     olpc_touch_list_clear();
 #endif
@@ -1743,7 +1743,7 @@ static rt_err_t olpc_note_screen_protection_exit(void *parameter)
 
     olpc_note_lutset(olpc_data);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_note_touch_register(parameter);
 #endif
 
@@ -1784,7 +1784,7 @@ static void olpc_note_thread(void *p)
     ret = olpc_note_lutset(olpc_data);
     RT_ASSERT(ret == RT_EOK);
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     olpc_note_touch_register(olpc_data);
     olpc_data->subctrltimer = rt_timer_create("notesub",
                               olpc_note_subctrltmr_callback,
@@ -1859,7 +1859,7 @@ static void olpc_note_thread(void *p)
     olpc_data->srctimer = RT_NULL;
 #endif
 
-#if defined(RT_USING_TOUCH)
+#if defined(RT_USING_PISCES_TOUCH)
     rt_timer_stop(olpc_data->subctrltimer);
     ret = rt_timer_delete(olpc_data->subctrltimer);
     RT_ASSERT(ret == RT_EOK);

@@ -8,6 +8,7 @@
 #define PM_HAS_CUSTOM_CONFIG
 
 /* RT-Thread Kernel */
+
 #define RT_USING_CORE_RTTHREAD
 /* RT_USING_CORE_FREERTOS is not set */
 #define RT_NAME_MAX 8
@@ -122,6 +123,8 @@
 /* RT_USING_MTD_NAND is not set */
 /* RT_USING_MTD is not set */
 #define RT_USING_PM
+/* RT_USING_PM_FG is not set */
+/* RT_USING_PM_CHARGER is not set */
 /* RT_USING_RTC is not set */
 /* RT_USING_SDIO is not set */
 #define RT_USING_SPI
@@ -149,6 +152,7 @@
 
 #define RT_USING_LIBC
 /* RT_USING_PTHREADS is not set */
+/* RT_USING_MODULE is not set */
 
 /* Network */
 
@@ -187,6 +191,7 @@
 #define PKG_CMBACKTRACE_DUMP_STACK
 #define PKG_CMBACKTRACE_PRINT_ENGLISH
 /* PKG_CMBACKTRACE_PRINT_CHINESE is not set */
+/* PKG_CMBACKTRACE_FAULT_DUMP_TO_FLASH is not set */
 /* RT_USING_LOGTRACE is not set */
 /* RT_USING_RYM is not set */
 /* RT_USING_ULOG is not set */
@@ -200,12 +205,8 @@
 /* RT-Thread Benchmarks */
 
 /* RT_USING_BENCHMARK is not set */
-/* RT_USING_PLAYER is not set */
-/* ENABLE_MP3_DECODER is not set */
-/* ENABLE_SPEEX_ENCODER is not set */
-/* ENABLE_AMR_CODEC is not set */
-/* ENABLE_PLAYER_TEST is not set */
-/* ENABLE_RECORDER_TEST is not set */
+/* RT_USING_NET_HTTP is not set */
+/* RT_USING_OTA is not set */
 /* RT_USING_PKGS is not set */
 
 /* RT-Thread board config */
@@ -224,13 +225,16 @@
 /* RT_USING_CRU_DUMP is not set */
 /* RT_USING_REGULATOR_DUMP is not set */
 /* RT_USING_PMIC is not set */
+#define RT_USING_CACHE
 #define RT_USING_UNCACHE_HEAP
 #define RT_UNCACHE_HEAP_ORDER 0x0E
 #define RT_USING_LARGE_HEAP
 #define RT_LARGE_MALLOC_THRRESH 512
+#define RT_LARGE_HEAP_SIZE 524288
 #define RT_USING_DTCM_HEAP
 #define RT_DTCM_MALLOC_THRRESH 512
 /* RT_USING_PANEL_GC9306_CTC28 is not set */
+/* RT_USING_PANEL_ST7789V_XF20 is not set */
 /* RT_USING_PANEL_FPGA_LVDS is not set */
 /* RT_USING_PANEL_SS is not set */
 #define RT_USING_PANEL_S6E3FC2X01
@@ -250,7 +254,13 @@
 /* RT_USING_PM_REQ_CLK is not set */
 /* RT_USING_DVFS_DBG is not set */
 #define RT_USING_PM_RUNTIME
+/* RT_USING_PM_TICK_DELAY is not set */
 #define RT_USING_PM_TIMER
+
+/* RT-Thread rockchip vicap driver */
+
+/* RT_USING_VICAP is not set */
+/* RT_USING_WDT_DUMP is not set */
 
 /* RT-Thread rockchip pisces drivers */
 
@@ -286,8 +296,8 @@
 
 #define RT_USING_SPI2APB
 /* RT_USING_SPI1 is not set */
-#define RT_USING_TOUCH
-#define RT_USING_TOUCH_ASYNC
+#define RT_USING_PISCES_TOUCH
+#define RT_USING_PISCES_TOUCH_ASYNC
 /* RT_USING_SYSTICK is not set */
 
 /* RT-Thread bsp test case */
@@ -302,20 +312,15 @@
 
 /* Pisces application */
 
-#define RT_USING_OLPC_DEMO
-#define OLPC_APP_SRCSAVER_ENABLE
-#define OLPC_APP_CLOCK_ENABLE
+/* RT_USING_OLPC_DEMO is not set */
+/* OLPC_STATICLD_ENABLE is not set */
 /* OLPC_APP_CLOCK_STYLE_ROUND_ARABIC is not set */
 /* OLPC_APP_CLOCK_STYLE_ROUND_ROMAN332 is not set */
-#define OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565
-/* OLPC_APP_CLOCK_LOOP_LAMP is not set */
-#define OLPC_APP_EBOOK_ENABLE
-#define OLPC_APP_BLOCK_ENABLE
-#define OLPC_APP_SNAKE_ENABLE
-#define OLPC_APP_NOTE_ENABLE
+/* OLPC_APP_CLOCK_STYLE_ROUND_ROMAN565 is not set */
 
 /* RT-Thread application */
 
 /* RT_USING_RK_IOT_APP is not set */
+/* ENABLE_DUAL_TRACKING is not set */
 
 #endif
