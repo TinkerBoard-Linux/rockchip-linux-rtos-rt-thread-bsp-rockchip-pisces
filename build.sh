@@ -13,12 +13,12 @@ APP_ROOT=olpc_demo
 if [ -z $PARM ]; then
     scons -j8 && scons --target=ua -s
     if grep -rw "^#define OLPC_DLMODULE_ENABLE" $RT_CONFIG; then
-        cd ../../../../rtthread-apps/
+        cd ../../../applications/rtthread-apps/
         if [ `find . -name $APP_ROOT` ]; then
 
-            export RTT_ROOT=../rt-thread
-            export BSP_ROOT=../rt-thread/bsp/rockchip/pisces
-            RT_CONFIG=../rt-thread/bsp/rockchip/pisces/rtconfig.h
+            export RTT_ROOT=../../
+            export BSP_ROOT=../../bsp/rockchip/pisces
+            RT_CONFIG=../../bsp/rockchip/pisces/rtconfig.h
 
             if grep -rw "^#define OLPC_APP_CLOCK_ENABLE" $RT_CONFIG; then
                 scons --app=$APP_ROOT/clock
@@ -55,7 +55,7 @@ if [ -z $PARM ]; then
 else
     if [ $PARM = "-c" ]; then
         scons -c
-        cd ../../../../rtthread-apps/
+        cd ../../../applications/rtthread-apps/
         rm -f $APP_ROOT/*/*.o
         rm -f $APP_ROOT/*/resource/*.o
         rm -rf $APP_ROOT/*/$APP_ROOT/
