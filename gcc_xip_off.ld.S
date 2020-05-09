@@ -28,7 +28,6 @@
  *   __StackTop
  *   __stack
  */
-
 #include "rtconfig.h"
 
 ENTRY(Reset_Handler)
@@ -36,9 +35,12 @@ _ram_fs_size = 0x10000;
 _system_stack_size = 0x400;
 _code_start_addr = 0x04000000;
 _data_start_off  = 0x1c000000;
-
 _dtcm_start_addr = 0x30200000;
 _dtcm_heap_size  = 0x80000;
+
+PROVIDE(xSramDataBase  = _code_start_addr + _data_start_off );
+PROVIDE(xSramBase  = _code_start_addr );
+PROVIDE(xSramSize  = 0x100000 );
 
 SECTIONS
 {
@@ -69,19 +71,18 @@ SECTIONS
         __vsymtab_end = .;
         . = ALIGN(4);
 
-        /* section information for modules */
-        . = ALIGN(4);
-        __rtmsymtab_start = .;
-        KEEP(*(RTMSymTab))
-        __rtmsymtab_end = .;
-        /* __rtmsymtab_len = __rtmsymtab_end - __rtmsymtab_start; */
-        . = ALIGN(4);
-
         /* section information for initial. */
         . = ALIGN(4);
         __rt_init_start = .;
         KEEP(*(SORT(.rti_fn*)))
         __rt_init_end = .;
+        . = ALIGN(4);
+
+         /* section information for modules */
+        . = ALIGN(4);
+        __rtmsymtab_start = .;
+        KEEP(*(RTMSymTab))
+        __rtmsymtab_end = .;
         . = ALIGN(4);
     }
 
@@ -171,7 +172,7 @@ SECTIONS
 
     }
 
-    .bss (NOLOAD):
+    .bss :
     {
         . = ALIGN(4);
         __bss_start__ = .;
@@ -192,7 +193,7 @@ SECTIONS
 
     /* region for large memory allocate */
 #ifdef RT_LARGE_HEAP_SIZE
-    .large (COPY):
+    .large :
     {
         . = ALIGN(4);
         __large_start__ = .;
@@ -201,30 +202,27 @@ SECTIONS
     }
 #endif
 
-    /* address for stack */
-    _stack_start_addr = .;
+    .stack :
+    {
+        . = ALIGN(4);
+        _sstack = .;
+        . = . + _system_stack_size;
+        _estack = .;
+        . = ALIGN(4);
+        PROVIDE(__StackTop = .);
+    }
 
+    __heap_start__ = .;
+
+#ifdef RT_USING_DTCM_HEAP
     /* region for dtcm memory allocate */
     . = _dtcm_start_addr;
-    .dtcm (COPY):
+    .dtcm (NOLOAD):
     {
         . = ALIGN(4);
         __dtcm_start__ = .;
         . = . + _dtcm_heap_size;
         __dtcm_end__ = .;
     }
-
-    . = _stack_start_addr;
-    .stack (COPY):
-    {
-        . = ALIGN(4);
-        _sstack = .;
-        *(.stack*)
-        _estack = .;
-    }
-
-    __heap_start__ = .;
-
-    /* Limt heap size >= 64KB */
-    ASSERT(__heap_start__ < (0x20100000 - 0x10000),  "error: memory overflow (heap size < 64KB)!!!")
+#endif
 }

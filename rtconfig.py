@@ -28,7 +28,11 @@ if os.getenv('RTT_EXEC_PATH'):
 
 #BUILD = 'debug'
 BUILD = 'release'
-XIP = 'disable'
+
+#XIP = 'Y'
+XIP = 'N'
+if os.getenv('RTT_BUILD_XIP'):
+    XIP = os.getenv('RTT_BUILD_XIP').upper()
 
 if PLATFORM == 'gcc':
     # toolchains
@@ -44,7 +48,7 @@ if PLATFORM == 'gcc':
     OBJCPY = PREFIX + 'objcopy'
     STRIP = PREFIX + 'strip'
 
-    DEVICE = ' -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections'
+    DEVICE = ' -mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -ffunction-sections -fdata-sections --specs=nano.specs'
     CFLAGS = DEVICE + ' -g -Wall -Werror=maybe-uninitialized -Werror=implicit-function-declaration -Werror=return-type -Werror=address -Werror=int-to-pointer-cast -Werror=pointer-to-int-cast '
     AFLAGS = ' -c' + DEVICE + ' -x assembler-with-cpp -Wa,-mimplicit-it=thumb -D__ASSEMBLY__ '
     LFLAGS = DEVICE + ' -lm -lgcc -lc' + ' -nostartfiles -Wl,--gc-sections,-Map=rtthread.map,-cref,-u,Reset_Handler '
@@ -52,12 +56,14 @@ if PLATFORM == 'gcc':
     CPATH = ''
     LPATH = ''
 
-    if XIP == 'enable':
-        AFLAGS += '-D__STARTUP_COPY_MULTIPLE '
-        CFLAGS += '-D__STARTUP_COPY_MULTIPLE '
-        LINK_SCRIPT = 'gcc_xip.ld'
+    if XIP == 'Y':
+        AFLAGS += ' -D__STARTUP_COPY_MULTIPLE -D__STARTUP_CLEAR_BSS_MULTIPLE'
+        CFLAGS += ' -D__STARTUP_COPY_MULTIPLE -D__STARTUP_CLEAR_BSS_MULTIPLE -DRT_USING_XIP'
+        LINK_SCRIPT = 'gcc_xip_on.ld'
     else:
-        LINK_SCRIPT = 'gcc_ram.ld'
+        AFLAGS += ' -D__STARTUP_CLEAR_BSS'
+        CFLAGS += ' -D__STARTUP_CLEAR_BSS'
+        LINK_SCRIPT = 'gcc_xip_off.ld'
 
     LFLAGS += '-T %s' % LINK_SCRIPT
 
