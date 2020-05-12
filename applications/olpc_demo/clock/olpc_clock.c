@@ -2130,7 +2130,11 @@ static rt_uint32_t task_switch_table[OLPC_CLOCK_HOME_ID_MAX] =
     0,
 #endif
     // 7
-    7
+#if defined(OLPC_APP_JUPITER_ENABLE)
+    EVENT_APP_JUPITER,
+#else
+    0,
+#endif
 };
 
 /**

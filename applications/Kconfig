@@ -66,6 +66,11 @@ if RT_USING_OLPC_DEMO
         depends on RT_USING_DTCM_HEAP
         default n
 
+    config OLPC_APP_JUPITER_ENABLE
+        bool "olpc jupiter demo select"
+        depends on RT_USING_DTCM_HEAP
+        default n
+
     config OLPC_APP_BLN_ENABLE
         bool "olpc breathing light demo select"
         depends on (!RT_USING_DTCM_HEAP) && (RT_USING_DSPFW_BUILTIN) && (!OLPC_DLMODULE_ENABLE)

@@ -47,6 +47,10 @@ if [ -z $PARM ]; then
             if grep -rw "^#define OLPC_APP_XSCREEN_ENABLE" $RT_CONFIG; then
                 scons --app=$APP_ROOT/xscreen
             fi
+
+            if grep -rw "^#define OLPC_APP_JUPITER_ENABLE" $RT_CONFIG; then
+                scons --app=$APP_ROOT/jupiter
+            fi
         else
             echo "Error: Can not find apps root-->"$APP_ROOT
         fi

@@ -48,6 +48,7 @@
 #define EVENT_APP_XSCREEN   (0x01UL << 5)
 #define EVENT_APP_BLN       (0x01UL << 6)
 #define EVENT_APP_LYRIC     (0x01UL << 7)
+#define EVENT_APP_JUPITER   (0x01UL << 8)
 
 /**
  * Global data struct for olpc display demo
@@ -267,8 +268,13 @@ int olpc_snake_app_init(void);
 /**
  * olpc xscreen demo application init.
  */
-
 int olpc_xscreen_app_init(void);
+
+/**
+ * olpc jupiter demo application init.
+ */
+int olpc_jupiter_app_init(void);
+
 /**
  * olpc bln demo application init.
  */

@@ -118,6 +118,10 @@ int olpc_xscreen_app_init()
 {
     return olpc_dlmodule_exec("xscreen.mo");
 }
+int olpc_jupiter_app_init()
+{
+    return olpc_dlmodule_exec("jupiter.mo");
+}
 
 #endif
 
@@ -138,6 +142,8 @@ static void olpc_apps_init(void)
     rt_event_send(olpc_main_event, EVENT_APP_NOTE);
 #elif defined(OLPC_APP_XSCREEN_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_XSCREEN);
+#elif defined(OLPC_APP_JUPITER_ENABLE)
+    rt_event_send(olpc_main_event, EVENT_APP_JUPITER);
 #elif defined(OLPC_APP_BLN_ENABLE)
     rt_event_send(olpc_main_event, EVENT_APP_BLN);
 #elif defined(OLPC_APP_LYRIC_ENABLE)
@@ -168,8 +174,11 @@ static void olpc_main_thread(void *p)
     while (1)
     {
         ret = rt_event_recv(olpc_main_event,
-                            EVENT_APP_CLOCK | EVENT_APP_EBOOK | EVENT_APP_BLOCK | EVENT_APP_SNAKE |
-                            EVENT_APP_NOTE  | EVENT_APP_XSCREEN | EVENT_APP_BLN | EVENT_APP_LYRIC,
+                            EVENT_APP_CLOCK   | EVENT_APP_EBOOK   |
+                            EVENT_APP_BLOCK   | EVENT_APP_SNAKE   |
+                            EVENT_APP_NOTE    | EVENT_APP_XSCREEN |
+                            EVENT_APP_BLN     | EVENT_APP_LYRIC   |
+                            EVENT_APP_JUPITER,
                             RT_EVENT_FLAG_OR | RT_EVENT_FLAG_CLEAR,
                             RT_WAITING_FOREVER, &event);
         RT_ASSERT(ret == RT_EOK);
@@ -220,6 +229,12 @@ static void olpc_main_thread(void *p)
         {
 #if defined(OLPC_APP_XSCREEN_ENABLE)
             ret = olpc_xscreen_app_init();
+#endif
+        }
+        else if (event & EVENT_APP_JUPITER)
+        {
+#if defined(OLPC_APP_JUPITER_ENABLE)
+            ret = olpc_jupiter_app_init();
 #endif
         }
 
