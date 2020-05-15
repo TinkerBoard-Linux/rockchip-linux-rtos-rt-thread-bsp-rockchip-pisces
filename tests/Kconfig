@@ -5,9 +5,14 @@ config RT_USING_PRIVATE_TEST
     default n
 
     if RT_USING_PRIVATE_TEST
+    config RT_USING_COMMON_TEST_DISPLAY
+        bool "Enable BSP Common DISPLAY TEST"
+        depends on RT_USING_VOP
+        default n
+
     config RT_USING_COMMON_TEST_TOUCH
         bool "Enable Touch TEST"
-        depends on RT_USING_TOUCH
+        depends on RT_USING_PISCES_TOUCH
         default n
     endif
 
