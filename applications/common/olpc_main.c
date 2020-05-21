@@ -165,10 +165,6 @@ static void olpc_main_thread(void *p)
     RT_ASSERT(olpc_main_event != RT_NULL);
     olpc_apps_init();
 
-#if defined(OLPC_DLMODULE_ENABLE)
-    olpc_dlmodule_exec("hello.mo"); //test
-#endif
-
     while (1)
     {
         ret = rt_event_recv(olpc_main_event,

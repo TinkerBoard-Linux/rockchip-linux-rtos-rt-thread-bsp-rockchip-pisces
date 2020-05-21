@@ -416,8 +416,6 @@ static void olpc_srcprotect_thread(void *p)
 
     rt_free((void *)olpc_data);
     olpc_data = RT_NULL;
-
-    rt_thread_delay(1);
 }
 
 /**

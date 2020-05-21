@@ -759,8 +759,6 @@ static void olpc_lyric_thread(void *p)
     olpc_data = RT_NULL;
 
     rt_event_send(olpc_main_event, EVENT_APP_CLOCK);
-
-    rt_thread_delay(1);
 }
 
 /**

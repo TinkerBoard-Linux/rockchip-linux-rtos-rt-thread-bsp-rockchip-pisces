@@ -523,7 +523,6 @@ static void olpc_bln_thread(void *p)
     olpc_data->blnfb = RT_NULL;
 
     rt_event_send(olpc_data->disp_event, EVENT_BLN_EXIT_DONE);
-    rt_thread_delay(1);
 }
 #endif
 
@@ -2216,8 +2215,6 @@ static void olpc_clock_thread(void *p)
     olpc_data = RT_NULL;
 
     rt_event_send(olpc_main_event, exitevt);
-
-    rt_thread_delay(1);
 }
 
 /**
