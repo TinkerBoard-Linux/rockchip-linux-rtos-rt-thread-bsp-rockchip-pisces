@@ -75,7 +75,7 @@ if PLATFORM == 'gcc':
 
     POST_ACTION = OBJCPY + ' -O binary $TARGET rtthread.bin\n' + SIZE + ' $TARGET \n'
 
-    M_CFLAGS = CFLAGS + ' -mlong-calls  -Dsourcerygxx -O0 -fPIC '
+    M_CFLAGS = CFLAGS + ' -mlong-calls  -Dsourcerygxx -fPIC '
     M_LFLAGS = DEVICE + ' -Wl,--gc-sections,-z,max-page-size=0x4 -shared -fPIC -e main -nostartfiles -nostdlib -static-libgcc'
     M_POST_ACTION = STRIP + ' -R .hash $TARGET\n' + SIZE + ' $TARGET \n'
 
