@@ -256,6 +256,23 @@ static void wakeup_iomux_config(void)
 }
 
 /**
+ * @brief  Config iomux for SFC1
+ */
+RT_WEAK RT_UNUSED void sfc1_iomux_config(void)
+{
+    HAL_PINCTRL_SetIOMUX(GPIO_BANK1,
+                         GPIO_PIN_C4 |  // SFC1_CS
+                         GPIO_PIN_C5 |  // SFC1_CLK
+                         GPIO_PIN_C6 |  // SFC1_D0
+                         GPIO_PIN_C7,   // SFC1_D1
+                         PIN_CONFIG_MUX_FUNC2);
+
+    HAL_PINCTRL_SetIOMUX(GPIO_BANK1,
+                         GPIO_PIN_C2 |  // SFC1_D3
+                         GPIO_PIN_C3,   // SFC1_D2
+                         PIN_CONFIG_MUX_FUNC3);
+}
+/**
  * @brief  Config iomux for board of M1
  */
 void rt_hw_iomux_config(void)
@@ -282,6 +299,9 @@ void rt_hw_iomux_config(void)
     i2c_slave_iomux_config();
     lcd_iomux_config();
     wakeup_iomux_config();
+#ifdef RT_USING_QPIPSRAM_FSPI_HOST
+    sfc1_iomux_config();
+#endif
 }
 
 /** @} */  // IOMUX_Public_Functions
