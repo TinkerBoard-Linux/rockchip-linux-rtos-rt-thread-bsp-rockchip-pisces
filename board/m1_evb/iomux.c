@@ -234,9 +234,9 @@ static void lcd_iomux_config(void)
 {
     HAL_PINCTRL_SetIOMUX(GPIO_BANK1,
                          GPIO_PIN_A0 |  // LCD_IN_RESETN (LCD Reset from AP)
-                         GPIO_PIN_A1 |  // LCD_IN_TE (LCD TE from AP)
+                         GPIO_PIN_A1 |  // LCD_IN_TE (TE from LCD)
                          GPIO_PIN_A2 |  // LCD_OUT_RESETN (Reset to LCD)
-                         GPIO_PIN_A3 |  // LCD_OUT_TE (TE to LCD)
+                         GPIO_PIN_A3 |  // LCD_OUT_TE (TE bypass to AP)
                          GPIO_PIN_A4,   // LDO_OUT_PWR_EN (Power Enable to External LDO)
                          PIN_CONFIG_MUX_FUNC1);
 }
