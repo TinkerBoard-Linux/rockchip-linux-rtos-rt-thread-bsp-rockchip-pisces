@@ -7,6 +7,9 @@ choice
     prompt "Board Type"
     default RT_USING_BOARD_M1_EVB
 
+    config RT_USING_BOARD_M1P_RK3399_EVB
+        bool "Enable M1P_RK3399_EVB board"
+
     config RT_USING_BOARD_M1_EVB
         bool "Enable M1_EVB board"
 
